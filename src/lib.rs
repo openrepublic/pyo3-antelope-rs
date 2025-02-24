@@ -99,6 +99,7 @@ pub fn encode_abi_type(py: Python, abi: &ABI, field_type: &String, field_value: 
                 for value in l {
                     encode_abi_type(py, abi, &field_type, &value, encoder);
                 }
+                return;
             }
             _ => {
                 panic!("Expected list value for field")
