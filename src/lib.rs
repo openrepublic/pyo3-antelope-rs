@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use antelope::chain::abi::{AbiStruct, ABI};
 use antelope::chain::action::{Action, PermissionLevel};
 use antelope::chain::asset::{Asset, Symbol};
@@ -380,7 +381,7 @@ impl<'a> FromPyObject<'a> for PyAction {
 fn create_and_sign_tx(
     m: &PyModule,
     chain_id: Vec<u8>,
-    abi: &str,
+    abis: HashMap<String, String>,
     actions: Vec<PyAction>,
     key: &str,
     expiration: u32,
@@ -389,8 +390,6 @@ fn create_and_sign_tx(
     ref_block_num: u16,
     ref_block_prefix: u32
 ) -> PyResult<Py<PyDict>> {
-    let abi = ABI::from_string(abi).expect("Invalid ABI");
-
     let private_key = PrivateKey::from_str(key, false)
         .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid key format! {e}")))?;
 
@@ -403,7 +402,13 @@ fn create_and_sign_tx(
         delay_sec: VarUint32::new(0),
     };
 
-    let actions = actions.iter().map(|a| convert_to_action(m.py(), a, &abi).unwrap()).collect();
+    let actions = actions.iter().map(|a| {
+        let account = a.account.clone();
+        let abi = ABI::from_string(
+            abis.get(&account).expect(format!("ABI for {account} not found!").as_str())
+        ).expect("Invalid ABI");
+        convert_to_action(m.py(), a, &abi).unwrap()
+    }).collect();
 
     let transaction = Transaction {
         header,
