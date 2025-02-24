@@ -88,6 +88,7 @@ impl<'a> FromPyObject<'a> for ActionDataTypes {
 }
 
 pub fn encode_abi_type(py: Python, abi: &ABI, field_type: &String, field_value: &ActionDataTypes, encoder: &mut Encoder) {
+    let og_field_type = field_type.clone();
     let mut field_type = field_type.clone();
     // handle array
     if field_type.ends_with("[]") {
@@ -102,7 +103,7 @@ pub fn encode_abi_type(py: Python, abi: &ABI, field_type: &String, field_value: 
                 return;
             }
             _ => {
-                panic!("Expected list value for field")
+                panic!("Expected list value for field {}: {:?}", og_field_type, field_value)
             }
         }
     }
