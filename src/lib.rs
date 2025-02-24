@@ -15,7 +15,7 @@ use antelope::util::bytes_to_hex;
 use chrono::NaiveDateTime;
 use pyo3::prelude::*;
 use pyo3::PyNativeType;
-use pyo3::types::{PyDict, PyFloat, PyList, PyLong};
+use pyo3::types::{PyBytes, PyDict, PyFloat, PyList, PyLong};
 
 
 pub fn str_to_timestamp(ts: &str) -> u32 {
@@ -61,7 +61,8 @@ impl<'a> FromPyObject<'a> for ActionDataTypes {
 
         // Try extracting as bytes (Python `bytes` or `bytearray`).
         //    ob.extract::<Vec<u8>>() handles both.
-        if let Ok(byte_vec) = ob.extract::<Vec<u8>>() {
+        if let Ok(byte_vec) = ob.downcast::<PyBytes>() {
+            let byte_vec: Vec<u8> = byte_vec.extract()?;
             return Ok(ActionDataTypes::Bytes(byte_vec));
         }
 
