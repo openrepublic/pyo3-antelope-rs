@@ -29,12 +29,12 @@ impl Symbol {
     }
 
     #[getter]
-    fn code(&self) -> SymbolCode {
+    pub fn code(&self) -> SymbolCode {
         SymbolCode { inner: self.inner.code() }
     }
 
     #[getter]
-    fn precision(&self) -> usize {
+    pub fn precision(&self) -> usize {
         self.inner.precision()
     }
 

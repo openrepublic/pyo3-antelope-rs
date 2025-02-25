@@ -1,7 +1,9 @@
+use std::str::FromStr;
 use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
 use antelope::chain::asset::{Asset as NativeAsset, Symbol as NativeSymbol};
 use pyo3::exceptions::PyValueError;
+use rust_decimal::Decimal;
 use crate::proxies::sym::Symbol;
 
 #[pyclass]
@@ -44,14 +46,35 @@ impl Asset {
         })
     }
 
+    #[staticmethod]
+    fn from_decimal(d: Decimal, precision: u8, sym: &str) -> PyResult<Self> {
+        let d_str = d.to_string();
+        let dot_idx = d_str.find('.')
+            .unwrap_or(Err(PyValueError::new_err("Could not find decimal point"))?);
+
+        let num_str = d_str[..dot_idx + 1 + precision as usize].to_string();
+        Ok(Asset::from_str(&format!("{} {}", num_str, sym))?)
+    }
+
+    fn to_decimal(&self) -> Decimal {
+        let mut str_amount = format!("{:0>width$}", self.amount(), width = self.symbol().precision() + 1);
+
+        if self.symbol().precision() > 0 {
+            let len = str_amount.len();
+            str_amount.insert(len - self.symbol().precision() as usize, '.');
+        }
+
+        Decimal::from_str(&str_amount).unwrap_or(Decimal::ZERO)
+    }
+
     /// Return the i64 amount
     #[getter]
-    fn amount(&self) -> i64 {
+    pub fn amount(&self) -> i64 {
         self.inner.amount()
     }
 
     #[getter]
-    fn symbol(&self) -> Symbol {
+    pub fn symbol(&self) -> Symbol {
         Symbol {
             inner: self.inner.symbol(),
         }

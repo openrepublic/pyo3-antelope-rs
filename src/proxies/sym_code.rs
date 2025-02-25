@@ -28,6 +28,11 @@ impl SymbolCode {
         Ok(SymbolCode { inner: NativeSymbolCode { value: sym }})
     }
 
+    #[getter]
+    pub fn value(&self) -> u64 {
+        self.inner.value
+    }
+
     fn __str__(&self) -> String {
         self.inner.as_string()
     }

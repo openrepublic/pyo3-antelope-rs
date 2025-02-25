@@ -28,6 +28,10 @@ impl Name {
         }
     }
 
+    pub fn value(&self) -> u64 {
+        self.inner.n
+    }
+
     fn __str__(&self) -> String {
         self.inner.as_string()
     }
