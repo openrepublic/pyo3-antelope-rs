@@ -1,9 +1,12 @@
+pub mod proxies;
+
 pub mod types;
 pub mod encode;
 pub mod utils;
 pub mod abi_store;
 
 use antelope::chain::action::Action;
+use antelope::chain::key_type::{KeyType, KeyTypeTrait};
 use antelope::chain::private_key::PrivateKey;
 use antelope::chain::time::TimePointSec;
 use antelope::chain::transaction::{CompressionType, PackedTransaction, SignedTransaction, Transaction, TransactionHeader};
@@ -13,6 +16,12 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use crate::abi_store::{load_abi, unload_abi};
+use crate::proxies::{
+    name::Name,
+    sym_code::SymbolCode,
+    sym::Symbol,
+    asset::Asset,
+};
 use crate::types::{into_action, PyAction};
 
 #[pyfunction]
@@ -84,12 +93,45 @@ fn create_and_sign_tx(
     })
 }
 
+#[pyfunction]
+fn gen_key_pair(key_type: u8) -> PyResult<(String, String)> {
+    let key_type = KeyType::from_index(key_type)
+        .map_err(|e| PyErr::new::<PyValueError, _>(format!("Invalid key type format {}", e)))?;
+
+    let private_key = PrivateKey::random(key_type)
+        .map_err(|e| PyErr::new::<PyValueError, _>(format!("Invalid key format {}", e)))?;
+
+    Ok((private_key.as_string(), private_key.to_public().to_string()))
+}
+
+#[pyfunction]
+fn get_pub_key(private_key: String) -> PyResult<String> {
+    let private_key = PrivateKey::from_str(private_key.as_str(), false)
+        .map_err(|e| PyErr::new::<PyValueError, _>(format!("Invalid key format {}", e)))?;
+
+    Ok(private_key.to_public().to_string())
+}
+
 #[pymodule]
 fn antelope_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pyo3_log::init();
+
+    // abi store mngmnt
     m.add_function(wrap_pyfunction!(load_abi, m)?)?;
     m.add_function(wrap_pyfunction!(unload_abi, m)?)?;
+
+    // utilities
+    m.add_function(wrap_pyfunction!(gen_key_pair, m)?)?;
+    m.add_function(wrap_pyfunction!(get_pub_key, m)?)?;
+
+    // tx pack
     m.add_function(wrap_pyfunction!(create_and_sign_tx, m)?)?;
+
+    // proxy classes
+    m.add_class::<Name>()?;
+    m.add_class::<SymbolCode>()?;
+    m.add_class::<Symbol>()?;
+    m.add_class::<Asset>()?;
 
     Ok(())
 }

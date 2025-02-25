@@ -158,7 +158,7 @@ pub fn encode_abi_type(
                 }
                 "name" | "account_name" => {
                     let name = Name::from_string(val)
-                        .map_err(|err| PyErr::new::<PyValueError, _>(format!("Could not parse Name \"{}\"", val)))?;
+                        .map_err(|err| PyErr::new::<PyValueError, _>(format!("Could not parse Name \"{}\": {}", val, err)))?;
 
                     Ok(name.pack(encoder))
                 }
@@ -189,7 +189,7 @@ pub fn encode_abi_type(
                 "extended_asset" => {
                     let ex_asset = ExtendedAsset::from_string(val)
                         .map_err(|e| PyErr::new::<PyValueError, _>(format!(
-                            "Could not parse ExtendedAsset \"{}\"", val
+                            "Could not parse ExtendedAsset \"{}\": {}", val, e
                         )))?;
                     Ok(ex_asset.pack(encoder))
                 }

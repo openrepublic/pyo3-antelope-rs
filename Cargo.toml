@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.23.5", features = ["extension-module"]}
-antelope-client = { git = "https://github.com/telosnetwork/antelope-rs.git", rev = "6b42986f0621852a65946b5e508887f5dafab9c7" }
-# antelope-client = { path = "../antelope-rs/crates/antelope" }
+# antelope-client = { git = "https://github.com/telosnetwork/antelope-rs.git", rev = "6b42986f0621852a65946b5e508887f5dafab9c7" }
+antelope-client = { path = "../antelope-rs/crates/antelope" }
 chrono = "0.4.39"
 pyo3-log = "0.12.1"
