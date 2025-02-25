@@ -5,7 +5,7 @@ use pyo3::exceptions::PyValueError;
 use crate::proxies::sym::Symbol;
 
 #[pyclass]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Asset {
     pub inner: NativeAsset,
 }

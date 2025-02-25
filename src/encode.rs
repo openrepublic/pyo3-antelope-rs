@@ -317,6 +317,22 @@ pub fn encode_abi_type(
             }
         }
 
+        ActionDataTypes::Name(name) => {
+            Ok(name.inner.pack(encoder))
+        }
+
+        ActionDataTypes::SymbolCode(sym_code) => {
+            Ok(sym_code.inner.pack(encoder))
+        }
+
+        ActionDataTypes::Symbol(sym) => {
+            Ok(sym.inner.pack(encoder))
+        }
+
+        ActionDataTypes::Asset(asset) => {
+            Ok(asset.inner.pack(encoder))
+        }
+
         other => {
             return Err(PyErr::new::<PyValueError, _>(format!(
                 "Unexpected action data type: {:?}",

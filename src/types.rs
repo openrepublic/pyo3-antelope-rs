@@ -1,10 +1,14 @@
 use antelope::chain::action::{Action, PermissionLevel};
-use antelope::chain::name::Name;
-use pyo3::{Bound, FromPyObject, Py, PyAny, PyErr, PyResult};
+use antelope::chain::name::{Name as NativeName};
+use pyo3::{Bound, FromPyObject, Py, PyAny, PyErr};
 use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::types::{PyBytes, PyDict, PyFloat, PyInt, PyList};
 use pyo3::prelude::*;
 use crate::encode::encode_params;
+use crate::proxies::asset::Asset;
+use crate::proxies::name::Name;
+use crate::proxies::sym::Symbol;
+use crate::proxies::sym_code::SymbolCode;
 
 #[derive(Debug)]
 pub enum ActionDataTypes {
@@ -15,6 +19,10 @@ pub enum ActionDataTypes {
     String(String),
     List(Py<PyList>),
     Struct(Py<PyDict>),
+    SymbolCode(SymbolCode),
+    Symbol(Symbol),
+    Asset(Asset),
+    Name(Name),
     None,
 }
 
@@ -62,6 +70,22 @@ impl<'a> FromPyObject<'a> for ActionDataTypes {
             return Ok(ActionDataTypes::Struct(py_dict.clone().unbind()));
         }
 
+        if let Ok(py_name) = ob.extract::<Name>() {
+            return Ok(ActionDataTypes::Name(py_name));
+        }
+
+        if let Ok(py_sym_code) = ob.extract::<SymbolCode>() {
+            return Ok(ActionDataTypes::SymbolCode(py_sym_code));
+        }
+
+        if let Ok(py_sym) = ob.extract::<Symbol>() {
+            return Ok(ActionDataTypes::Symbol(py_sym));
+        }
+
+        if let Ok(py_asset) = ob.extract::<Asset>() {
+            return Ok(ActionDataTypes::Asset(py_asset));
+        }
+
         // If all attempts failed, raise a TypeError:
         Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
             format!("Cannot convert to ActionDataTypes: {:?}", ob)
@@ -78,8 +102,8 @@ pub struct PyAction {
 
 pub fn into_action(action: &PyAction) -> PyResult<Action> {
     Ok(Action {
-        account: Name::new_from_str(&action.account),
-        name: Name::new_from_str(&action.name),
+        account: NativeName::new_from_str(&action.account),
+        name: NativeName::new_from_str(&action.name),
         authorization: action.authorization.clone(),
         data: encode_params(&action.account, &action.name, &action.data)?,
     })
@@ -133,7 +157,7 @@ impl<'a> FromPyObject<'a> for PyAction {
             let actor_str: String = actor_obj
                 .extract()
                 .map_err(|_| PyErr::new::<PyTypeError, _>("'actor' must be a string"))?;
-            let actor = Name::new_from_str(&actor_str);
+            let actor = NativeName::new_from_str(&actor_str);
 
             let perm_obj = auth_dict
                 .get_item("permission")?
@@ -141,7 +165,7 @@ impl<'a> FromPyObject<'a> for PyAction {
             let perm_str: String = perm_obj
                 .extract()
                 .map_err(|_| PyErr::new::<PyTypeError, _>("'permission' must be a string"))?;
-            let permission = Name::new_from_str(&perm_str);
+            let permission = NativeName::new_from_str(&perm_str);
 
             authorization.push(PermissionLevel { actor, permission });
         }

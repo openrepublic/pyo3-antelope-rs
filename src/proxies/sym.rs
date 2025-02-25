@@ -4,7 +4,7 @@ use antelope::chain::asset::{Symbol as NativeSymbol, SymbolError};
 use crate::proxies::sym_code::SymbolCode;
 
 #[pyclass]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Symbol {
     pub inner: NativeSymbol,
 }

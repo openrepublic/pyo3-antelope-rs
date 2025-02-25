@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 
 /// A Python-exposed wrapper around the `antelope::Name` struct.
 #[pyclass]
+#[derive(Debug, Clone)]
 pub struct Name {
     pub inner: NativeName,
 }

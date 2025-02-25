@@ -3,7 +3,7 @@ use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
 
 #[pyclass]
-#[derive(Clone)]  // So we can clone in __richcmp__
+#[derive(Debug, Clone)]
 pub struct SymbolCode {
     pub inner: NativeSymbolCode,
 }
