@@ -4,7 +4,7 @@ let
     rustup openssl pkg-config libiconv
     libclang rustPlatform.bindgenHook gcc13
     libcxx gnumake autoconf automake libtool cmake
-    maturin
+    uv maturin
   ];
 
 in
@@ -27,4 +27,9 @@ pkgs.mkShell {
   LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
   RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath nativeBuildInputs;
+
+  shellHook = ''
+    set -e
+    uv venv .venv --python=3.12
+  '';
 }
