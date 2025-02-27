@@ -226,7 +226,7 @@ pub fn encode_abi_type(
                         )))?;
                     Ok(c.pack(encoder))
                 }
-                "checksum256" | "sha256" => {
+                "checksum256" | "sha256" | "transaction_id" => {
                     let c = Checksum256::from_hex(val.as_str())
                         .map_err(|e| PyErr::new::<PyValueError, _>(format!(
                             "Wrong encoding for checksum256 string: {}",

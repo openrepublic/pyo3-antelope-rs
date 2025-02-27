@@ -12,7 +12,6 @@ use antelope::chain::public_key::PublicKey;
 use antelope::chain::signature::Signature;
 use antelope::chain::time::{BlockTimestamp, TimePoint, TimePointSec};
 use antelope::chain::varint::VarUint32;
-use log::info;
 use pyo3::{IntoPyObject, Py, PyResult, Python};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -206,7 +205,7 @@ pub fn decode_abi_type(
 
                     Ok(ActionDataTypes::String(val.to_string()))
                 }
-                "sha256" | "checksum256" => {
+                "sha256" | "checksum256" | "transaction_id" => {
                     let mut val = Checksum256::default();
                     decoder.unpack(&mut val);
 
