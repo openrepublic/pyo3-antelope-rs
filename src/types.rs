@@ -1,6 +1,6 @@
 use antelope::chain::action::{Action, PermissionLevel};
 use antelope::chain::name::{Name as NativeName};
-use pyo3::{Bound, FromPyObject, Py, PyAny, PyErr};
+use pyo3::{Bound, FromPyObject, IntoPyObjectExt, Py, PyAny, PyErr};
 use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::types::{PyBytes, PyDict, PyFloat, PyInt, PyList};
 use pyo3::prelude::*;
@@ -90,6 +90,51 @@ impl<'a> FromPyObject<'a> for ActionDataTypes {
         Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
             format!("Cannot convert to ActionDataTypes: {:?}", ob)
         ))
+    }
+}
+
+impl<'py> IntoPyObject<'py> for ActionDataTypes {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        match self {
+            ActionDataTypes::Bool(val) => {
+                Ok(val.into_bound_py_any(py)?)
+            }
+            ActionDataTypes::Int(int) => {
+                Ok(int.into_bound_py_any(py)?)
+            }
+            ActionDataTypes::Float(val) => {
+                Ok(val.into_bound_py_any(py)?)
+            },
+            ActionDataTypes::Bytes(val) => {
+                Ok(val.into_bound_py_any(py)?)
+            },
+            ActionDataTypes::String(val) => {
+                Ok(val.into_bound_py_any(py)?)
+            },
+            ActionDataTypes::List(list) => {
+                Ok(list.into_bound_py_any(py)?)
+            },
+            ActionDataTypes::Struct(dict) => {
+                Ok(dict.into_bound_py_any(py)?)
+            },
+            ActionDataTypes::SymbolCode(obj) => {
+                Ok(obj.into_bound_py_any(py)?)
+            },
+            ActionDataTypes::Symbol(obj) => {
+                Ok(obj.into_bound_py_any(py)?)
+            },
+            ActionDataTypes::Asset(obj) => {
+                Ok(obj.into_bound_py_any(py)?)
+            },
+            ActionDataTypes::Name(obj) => {
+                Ok(obj.into_bound_py_any(py)?)
+            },
+            ActionDataTypes::None => Ok(py.None().into_bound_py_any(py)?),
+        }
     }
 }
 

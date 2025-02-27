@@ -4,8 +4,10 @@ pub mod types;
 pub mod encode;
 pub mod utils;
 pub mod abi_store;
+pub mod decode;
 
 use antelope::chain::action::Action;
+use antelope::chain::{Decoder, Encoder};
 use antelope::chain::key_type::{KeyType, KeyTypeTrait};
 use antelope::chain::private_key::PrivateKey;
 use antelope::chain::time::TimePointSec;
@@ -15,14 +17,47 @@ use antelope::util::bytes_to_hex;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use crate::abi_store::{load_abi, unload_abi};
+use crate::abi_store::{get_abi, load_abi, unload_abi};
+use crate::encode::encode_abi_type;
+use crate::decode::decode_abi_type;
 use crate::proxies::{
     name::Name,
     sym_code::SymbolCode,
     sym::Symbol,
     asset::Asset,
 };
-use crate::types::{into_action, PyAction};
+use crate::types::{into_action, ActionDataTypes, PyAction};
+
+
+#[pyfunction]
+fn abi_pack(
+    account: &str,
+    type_alias: &str,
+    value: ActionDataTypes
+) -> PyResult<Vec<u8>> {
+    let mut encoder = Encoder::new(0);
+    let abi = get_abi(account)?;
+
+    Python::with_gil(|py| -> PyResult<usize> {
+        encode_abi_type(py, &abi, type_alias, &value, &mut encoder)
+    })?;
+
+    Ok(encoder.get_bytes().to_vec())
+}
+
+#[pyfunction]
+fn abi_unpack(
+    account: &str,
+    type_alias: &str,
+    buff: &[u8],
+) -> PyResult<ActionDataTypes> {
+    let mut decoder = Decoder::new(buff);
+    let abi = get_abi(account)?;
+
+    Python::with_gil(|py| -> PyResult<ActionDataTypes> {
+       decode_abi_type(py, &abi, type_alias, buff.len(), &mut decoder)
+    })
+}
 
 #[pyfunction]
 fn create_and_sign_tx(
@@ -124,7 +159,9 @@ fn antelope_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(gen_key_pair, m)?)?;
     m.add_function(wrap_pyfunction!(get_pub_key, m)?)?;
 
-    // tx pack
+    // pack/unpack
+    m.add_function(wrap_pyfunction!(abi_pack, m)?)?;
+    m.add_function(wrap_pyfunction!(abi_unpack, m)?)?;
     m.add_function(wrap_pyfunction!(create_and_sign_tx, m)?)?;
 
     // proxy classes
