@@ -27,7 +27,7 @@ wheels = [
 
 [[package]]
 name = "pyo3-antelope-rs"
-version = "0.1a1"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "maturin" },

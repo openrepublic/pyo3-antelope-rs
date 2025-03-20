@@ -1,89 +1,162 @@
+use std::str::FromStr;
 use antelope::chain::action::{Action, PermissionLevel};
 use antelope::chain::name::{Name as NativeName};
-use pyo3::{Bound, FromPyObject, IntoPyObjectExt, Py, PyAny, PyErr};
-use pyo3::exceptions::{PyKeyError, PyTypeError};
+use antelope::util::bytes_to_hex;
+use antelope::serializer::serde::encode::encode_params;
+use pyo3::{Bound, FromPyObject, IntoPyObjectExt, PyAny, PyErr};
+use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
 use pyo3::types::{PyBytes, PyDict, PyFloat, PyInt, PyList};
 use pyo3::prelude::*;
-use crate::encode::encode_params;
+use pyo3_tools::py_struct;
+use serde_json::{Map, Number, Value};
+use crate::abi_store::get_abi;
 use crate::proxies::asset::Asset;
 use crate::proxies::name::Name;
 use crate::proxies::sym::Symbol;
 use crate::proxies::sym_code::SymbolCode;
 
-#[derive(Debug)]
-pub enum ActionDataTypes {
-    Bool(bool),
-    Int(Py<PyInt>),
-    Float(Py<PyFloat>),
+py_struct!(PyPermissionLevel {
+    actor: String,
+    permission: String
+});
+
+impl Into<PyResult<PermissionLevel>> for PyPermissionLevel {
+    fn into(self) -> PyResult<PermissionLevel> {
+        Ok(PermissionLevel::new(
+            NativeName::from_string(&self.actor).map_err(|e| PyValueError::new_err(e.to_string()))?,
+            NativeName::from_string(&self.permission).map_err(|e| PyValueError::new_err(e.to_string()))?,
+        ))
+    }
+}
+
+py_struct!(PyAction {
+    account: String,
+    name: String,
+    authorization: Vec<PyPermissionLevel>,
+    data: Vec<AntelopeTypes>,
+});
+
+impl Into<PyResult<Action>> for PyAction {
+    fn into(self) -> PyResult<Action> {
+        let mut auths = Vec::new();
+        for auth in self.authorization {
+            let maybe_perm: PyResult<PermissionLevel> = auth.into();
+            auths.push(maybe_perm?);
+        }
+        Ok(Action {
+            account: NativeName::new_from_str(&self.account),
+            name: NativeName::new_from_str(&self.name),
+            authorization: auths,
+            data: encode_params(
+                &get_abi(&self.account)
+                    .map_err(|e| PyKeyError::new_err(e))?,
+                &self.account,
+                &self.name,
+                &self.data.iter().map(|v| v.clone().into_value()).collect(),
+            ).map_err(|e| PyValueError::new_err(e.to_string()))?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum AntelopeTypes {
+    Value(Value),
     Bytes(Vec<u8>),
-    String(String),
-    List(Py<PyList>),
-    Struct(Py<PyDict>),
     SymbolCode(SymbolCode),
     Symbol(Symbol),
     Asset(Asset),
     Name(Name),
-    None,
 }
 
-impl<'a> FromPyObject<'a> for ActionDataTypes {
+impl AntelopeTypes {
+    pub fn into_value(self) -> Value {
+        match self {
+            AntelopeTypes::Value(val) => val,
+            AntelopeTypes::Bytes(val) => Value::String(bytes_to_hex(&val)),
+            AntelopeTypes::SymbolCode(val) => Value::Number(Number::from(val.inner.value())),
+            AntelopeTypes::Symbol(val) => Value::Number(Number::from(val.inner.value())),
+            AntelopeTypes::Asset(val) => Value::String(val.inner.to_string()),
+            AntelopeTypes::Name(val) => Value::Number(Number::from(val.inner.value())),
+        }
+    }
+}
+
+impl<'a> FromPyObject<'a> for AntelopeTypes {
     fn extract_bound(ob: &Bound<'a, PyAny>) -> PyResult<Self> {
         // Check if it's None
         if ob.is_none() {
-            return Ok(ActionDataTypes::None);
+            return Ok(AntelopeTypes::Value(Value::Null));
         }
 
         // Try downcasting to bool
         if let Ok(py_bool) = ob.extract::<bool>() {
-            return Ok(ActionDataTypes::Bool(py_bool));
+            return Ok(AntelopeTypes::Value(Value::Bool(py_bool)));
         }
 
         // Try downcasting to PyInt
         if let Ok(py_int) = ob.downcast::<PyInt>() {
-            return Ok(ActionDataTypes::Int(py_int.clone().unbind()));
+            let num_str = py_int.to_string();
+            return Ok(AntelopeTypes::Value(Value::Number(
+                Number::from_str(&num_str)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?)));
         }
 
         // Try downcasting to PyFloat
         if let Ok(py_float) = ob.downcast::<PyFloat>() {
-            return Ok(ActionDataTypes::Float(py_float.clone().unbind()));
+            let f: f64 = py_float.extract()?;
+            return Ok(AntelopeTypes::Value(Value::Number(Number::from_f64(f)
+                .ok_or_else(|| PyValueError::new_err("f64 cannot be converted to Number"))?)));
         }
 
         // Try extracting as bytes (Python `bytes` or `bytearray`).
         //    ob.extract::<Vec<u8>>() handles both.
         if let Ok(byte_vec) = ob.downcast::<PyBytes>() {
             let byte_vec: Vec<u8> = byte_vec.extract()?;
-            return Ok(ActionDataTypes::Bytes(byte_vec));
+            return Ok(AntelopeTypes::Bytes(byte_vec));
         }
 
         // Try extracting as a String
         if let Ok(s) = ob.extract::<String>() {
-            return Ok(ActionDataTypes::String(s));
+            return Ok(AntelopeTypes::Value(Value::String(s)));
         }
 
         // Check if it's a list
         if let Ok(py_list) = ob.downcast::<PyList>() {
-            return Ok(ActionDataTypes::List(py_list.clone().unbind()));
+            let mut values: Vec<Value> = Vec::with_capacity(py_list.len());
+            for item in py_list {
+                let value = AntelopeTypes::extract_bound(&item)?
+                    .into_value();
+                values.push(value);
+            }
+            return Ok(AntelopeTypes::Value(Value::Array(values)));
         }
 
         // Check if it's a dict
         if let Ok(py_dict) = ob.downcast::<PyDict>() {
-            return Ok(ActionDataTypes::Struct(py_dict.clone().unbind()));
+            let mut obj: Map<String, Value> = Map::new();
+            for (k, v) in py_dict {
+                let key: String = k.extract()?;
+                let value: Value = AntelopeTypes::extract_bound(&v)?
+                    .into_value();
+                obj.insert(key, value);
+            }
+            return Ok(AntelopeTypes::Value(Value::Object(obj)));
         }
 
         if let Ok(py_name) = ob.extract::<Name>() {
-            return Ok(ActionDataTypes::Name(py_name));
+            return Ok(AntelopeTypes::Name(py_name));
         }
 
         if let Ok(py_sym_code) = ob.extract::<SymbolCode>() {
-            return Ok(ActionDataTypes::SymbolCode(py_sym_code));
+            return Ok(AntelopeTypes::SymbolCode(py_sym_code));
         }
 
         if let Ok(py_sym) = ob.extract::<Symbol>() {
-            return Ok(ActionDataTypes::Symbol(py_sym));
+            return Ok(AntelopeTypes::Symbol(py_sym));
         }
 
         if let Ok(py_asset) = ob.extract::<Asset>() {
-            return Ok(ActionDataTypes::Asset(py_asset));
+            return Ok(AntelopeTypes::Asset(py_asset));
         }
 
         // If all attempts failed, raise a TypeError:
@@ -93,133 +166,49 @@ impl<'a> FromPyObject<'a> for ActionDataTypes {
     }
 }
 
-impl<'py> IntoPyObject<'py> for ActionDataTypes {
+impl<'py> IntoPyObject<'py> for AntelopeTypes {
     type Target = PyAny;
     type Output = Bound<'py, Self::Target>;
     type Error = PyErr;
 
     fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         match self {
-            ActionDataTypes::Bool(val) => {
-                Ok(val.into_bound_py_any(py)?)
-            }
-            ActionDataTypes::Int(int) => {
-                Ok(int.into_bound_py_any(py)?)
-            }
-            ActionDataTypes::Float(val) => {
-                Ok(val.into_bound_py_any(py)?)
+            AntelopeTypes::Value(val) => {
+               match val {
+                   Value::Null => Ok(py.None().into_bound_py_any(py)?),
+                   Value::Bool(b) => Ok(b.into_bound_py_any(py)?),
+                   Value::Number(num) => {
+                       if num.is_f64() {
+                           return Ok(num.as_f64().unwrap().into_bound_py_any(py)?)
+                       } else if num.is_u64() {
+                           return Ok(num.as_u64().unwrap().into_bound_py_any(py)?)
+                       } else if num.is_i64() {
+                           return Ok(num.as_i64().unwrap().into_bound_py_any(py)?)
+                       }
+                       Err(PyValueError::new_err("Cannot convert Value::Number into py bound"))
+                   },
+                   Value::String(s) => Ok(s.into_bound_py_any(py)?),
+                   Value::Array(values) => {
+                       let py_list = PyList::empty(py);
+                       for val in values {
+                           py_list.append(AntelopeTypes::Value(val).into_pyobject(py)?)?
+                       }
+                       Ok(py_list.into_any())
+                   }
+                   Value::Object(obj) => {
+                       let py_dict = PyDict::new(py);
+                       for (k, v) in obj {
+                           py_dict.set_item(k, AntelopeTypes::Value(v))?
+                       }
+                       Ok(py_dict.into_any())
+                   }
+               }
             },
-            ActionDataTypes::Bytes(val) => {
-                Ok(val.into_bound_py_any(py)?)
-            },
-            ActionDataTypes::String(val) => {
-                Ok(val.into_bound_py_any(py)?)
-            },
-            ActionDataTypes::List(list) => {
-                Ok(list.into_bound_py_any(py)?)
-            },
-            ActionDataTypes::Struct(dict) => {
-                Ok(dict.into_bound_py_any(py)?)
-            },
-            ActionDataTypes::SymbolCode(obj) => {
-                Ok(obj.into_bound_py_any(py)?)
-            },
-            ActionDataTypes::Symbol(obj) => {
-                Ok(obj.into_bound_py_any(py)?)
-            },
-            ActionDataTypes::Asset(obj) => {
-                Ok(obj.into_bound_py_any(py)?)
-            },
-            ActionDataTypes::Name(obj) => {
-                Ok(obj.into_bound_py_any(py)?)
-            },
-            ActionDataTypes::None => Ok(py.None().into_bound_py_any(py)?),
+            AntelopeTypes::SymbolCode(obj) => Ok(obj.into_bound_py_any(py)?),
+            AntelopeTypes::Symbol(obj) => Ok(obj.into_bound_py_any(py)?),
+            AntelopeTypes::Asset(obj) => Ok(obj.into_bound_py_any(py)?),
+            AntelopeTypes::Name(obj) => Ok(obj.into_bound_py_any(py)?),
+            AntelopeTypes::Bytes(bytes) => Ok(bytes.into_bound_py_any(py)?)
         }
-    }
-}
-
-pub struct PyAction {
-    pub account: String,
-    pub name: String,
-    pub authorization: Vec<PermissionLevel>,
-    pub data: Vec<ActionDataTypes>,
-}
-
-pub fn into_action(action: &PyAction) -> PyResult<Action> {
-    Ok(Action {
-        account: NativeName::new_from_str(&action.account),
-        name: NativeName::new_from_str(&action.name),
-        authorization: action.authorization.clone(),
-        data: encode_params(&action.account, &action.name, &action.data)?,
-    })
-}
-
-impl<'a> FromPyObject<'a> for PyAction {
-    fn extract_bound(ob: &Bound<'a, PyAny>) -> PyResult<Self> {
-        // First, downcast to a PyDict or raise a TypeError if that fails.
-        let py_dict = ob
-            .downcast::<PyDict>()
-            .map_err(|_| PyErr::new::<PyTypeError, _>("Expected a dict for PyAction"))?;
-
-        // --- account ---
-        let account_obj = py_dict
-            .get_item("account")? // -> PyResult<Option<Bound<PyAny>>>
-            .ok_or_else(|| PyErr::new::<PyKeyError, _>("Missing 'account' key"))?;
-        let account: String = account_obj
-            .extract()
-            .map_err(|_| PyErr::new::<PyTypeError, _>("'account' must be a string"))?;
-
-        // --- name ---
-        let name_obj = py_dict
-            .get_item("name")?
-            .ok_or_else(|| PyErr::new::<PyKeyError, _>("Missing 'name' key"))?;
-        let name: String = name_obj
-            .extract()
-            .map_err(|_| PyErr::new::<PyTypeError, _>("'name' must be a string"))?;
-
-        // --- data ---
-        let data_obj = py_dict
-            .get_item("data")?
-            .ok_or_else(|| PyErr::new::<PyKeyError, _>("Missing 'data' key"))?;
-        let data: Vec<ActionDataTypes> = data_obj
-            .extract()
-            .map_err(|_| PyErr::new::<PyTypeError, _>("'data' must be a Vec<ActionDataTypes>"))?;
-
-        // --- authorization ---
-        let auth_obj = py_dict
-            .get_item("authorization")?
-            .ok_or_else(|| PyErr::new::<PyKeyError, _>("Missing 'authorization' key"))?;
-        let auth_list = auth_obj
-            .extract::<Vec<Bound<PyDict>>>()
-            .map_err(|_| PyErr::new::<PyTypeError, _>("'authorization' must be a list of dicts"))?;
-
-        // Convert each authorization dict into a PermissionLevel
-        let mut authorization = Vec::with_capacity(auth_list.len());
-        for auth_dict in auth_list {
-            let actor_obj = auth_dict
-                .get_item("actor")?
-                .ok_or_else(|| PyErr::new::<PyKeyError, _>("Missing 'actor' key"))?;
-            let actor_str: String = actor_obj
-                .extract()
-                .map_err(|_| PyErr::new::<PyTypeError, _>("'actor' must be a string"))?;
-            let actor = NativeName::new_from_str(&actor_str);
-
-            let perm_obj = auth_dict
-                .get_item("permission")?
-                .ok_or_else(|| PyErr::new::<PyKeyError, _>("Missing 'permission' key"))?;
-            let perm_str: String = perm_obj
-                .extract()
-                .map_err(|_| PyErr::new::<PyTypeError, _>("'permission' must be a string"))?;
-            let permission = NativeName::new_from_str(&perm_str);
-
-            authorization.push(PermissionLevel { actor, permission });
-        }
-
-        Ok(PyAction {
-            account,
-            name,
-            authorization,
-            data,
-        })
     }
 }

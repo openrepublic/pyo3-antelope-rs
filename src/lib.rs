@@ -1,10 +1,8 @@
 pub mod proxies;
 
 pub mod types;
-pub mod encode;
 pub mod utils;
 pub mod abi_store;
-pub mod decode;
 
 use antelope::chain::action::Action;
 use antelope::chain::{Decoder, Encoder};
@@ -13,34 +11,33 @@ use antelope::chain::private_key::PrivateKey;
 use antelope::chain::time::TimePointSec;
 use antelope::chain::transaction::{CompressionType, PackedTransaction, SignedTransaction, Transaction, TransactionHeader};
 use antelope::chain::varint::VarUint32;
+use antelope::serializer::serde::decode::decode_abi_type;
+use antelope::serializer::serde::encode::encode_abi_type;
 use antelope::util::bytes_to_hex;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use crate::abi_store::{get_abi, load_abi, unload_abi};
-use crate::encode::encode_abi_type;
-use crate::decode::decode_abi_type;
 use crate::proxies::{
     name::Name,
     sym_code::SymbolCode,
     sym::Symbol,
     asset::Asset,
 };
-use crate::types::{into_action, ActionDataTypes, PyAction};
+use crate::types::{AntelopeTypes, PyAction};
 
 
 #[pyfunction]
 fn abi_pack(
     account: &str,
     type_alias: &str,
-    value: ActionDataTypes
+    value: AntelopeTypes
 ) -> PyResult<Vec<u8>> {
     let mut encoder = Encoder::new(0);
     let abi = get_abi(account)?;
 
-    Python::with_gil(|py| -> PyResult<usize> {
-        encode_abi_type(py, &abi, type_alias, &value, &mut encoder)
-    })?;
+    encode_abi_type(&abi, type_alias, &value.into_value(), &mut encoder)
+        .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
     Ok(encoder.get_bytes().to_vec())
 }
@@ -50,13 +47,29 @@ fn abi_unpack(
     account: &str,
     type_alias: &str,
     buff: &[u8],
-) -> PyResult<ActionDataTypes> {
+) -> PyResult<AntelopeTypes> {
     let mut decoder = Decoder::new(buff);
     let abi = get_abi(account)?;
 
-    Python::with_gil(|py| -> PyResult<ActionDataTypes> {
-       decode_abi_type(py, &abi, type_alias, buff.len(), &mut decoder)
-    })
+    Ok(AntelopeTypes::Value(decode_abi_type(&abi, type_alias, buff.len(), &mut decoder)
+        .map_err(|err| PyValueError::new_err(err.to_string()))?))
+}
+
+#[pyfunction]
+fn abi_unpack_msgspec(
+    account: &str,
+    type_alias: &str,
+    buff: &[u8],
+) -> PyResult<Vec<u8>> {
+    let mut decoder = Decoder::new(buff);
+    let abi = get_abi(account)?;
+
+    let value = decode_abi_type(&abi, type_alias, buff.len(), &mut decoder)
+        .map_err(|err| PyValueError::new_err(err.to_string()))?;
+
+    let buffer = rmp_serde::encode::to_vec(&value).map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+    Ok(buffer)
 }
 
 #[pyfunction]
@@ -88,7 +101,8 @@ fn create_and_sign_tx(
     // serializing the action params
     let mut _actions: Vec<Action> = Vec::new();
     for action in actions {
-        _actions.push(into_action(&action)?);
+        let maybe_action: PyResult<Action> = action.into();
+        _actions.push(maybe_action?);
     }
     let actions = _actions;
 
@@ -162,6 +176,7 @@ fn antelope_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // pack/unpack
     m.add_function(wrap_pyfunction!(abi_pack, m)?)?;
     m.add_function(wrap_pyfunction!(abi_unpack, m)?)?;
+    m.add_function(wrap_pyfunction!(abi_unpack_msgspec, m)?)?;
     m.add_function(wrap_pyfunction!(create_and_sign_tx, m)?)?;
 
     // proxy classes
