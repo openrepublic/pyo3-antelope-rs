@@ -1,7 +1,8 @@
 use std::str::FromStr;
+use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
 use antelope::chain::action::{Action, PermissionLevel};
 use antelope::chain::name::{Name as NativeName};
-use antelope::util::bytes_to_hex;
 use antelope::serializer::serde::encode::encode_params;
 use pyo3::{Bound, FromPyObject, IntoPyObjectExt, PyAny, PyErr};
 use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
@@ -72,7 +73,7 @@ impl AntelopeTypes {
     pub fn into_value(self) -> Value {
         match self {
             AntelopeTypes::Value(val) => val,
-            AntelopeTypes::Bytes(val) => Value::String(bytes_to_hex(&val)),
+            AntelopeTypes::Bytes(val) => Value::String(BASE64_STANDARD.encode(&val)),
             AntelopeTypes::SymbolCode(val) => Value::Number(Number::from(val.inner.value())),
             AntelopeTypes::Symbol(val) => Value::Number(Number::from(val.inner.value())),
             AntelopeTypes::Asset(val) => Value::String(val.inner.to_string()),
