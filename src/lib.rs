@@ -56,7 +56,7 @@ fn abi_unpack(
 }
 
 #[pyfunction]
-fn abi_unpack_msgspec(
+fn abi_unpack_msgpack(
     account: &str,
     type_alias: &str,
     buff: &[u8],
@@ -176,7 +176,7 @@ fn antelope_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // pack/unpack
     m.add_function(wrap_pyfunction!(abi_pack, m)?)?;
     m.add_function(wrap_pyfunction!(abi_unpack, m)?)?;
-    m.add_function(wrap_pyfunction!(abi_unpack_msgspec, m)?)?;
+    m.add_function(wrap_pyfunction!(abi_unpack_msgpack, m)?)?;
     m.add_function(wrap_pyfunction!(create_and_sign_tx, m)?)?;
 
     // proxy classes
