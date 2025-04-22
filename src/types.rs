@@ -52,7 +52,6 @@ impl PyAction {
             authorization: auths,
             data: encode_params(
                 &abi.inner,
-                &self.account,
                 &self.name,
                 &self.data.iter().map(|v| v.clone().into_value()).collect(),
             ).map_err(|e| PyValueError::new_err(e.to_string()))?,
