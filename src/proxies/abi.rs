@@ -5,6 +5,8 @@ use antelope::serializer::generic::encode::encode_abi_type;
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use serde_json::Serializer;
+use serde::ser::Serialize;
 use crate::impl_packable_py;
 use crate::types::AntelopeTypes;
 
@@ -27,7 +29,13 @@ impl_packable_py! {
         }
 
         pub fn to_string(&self) -> String {
-            serde_json::to_string(&self.inner).unwrap()
+            let mut buf = Vec::new();
+            let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    "); // 4 spaces
+            let mut serializer = Serializer::with_formatter(&mut buf, formatter);
+
+            self.inner.serialize(&mut serializer).unwrap();
+
+            String::from_utf8(buf).unwrap()
         }
 
         pub fn pack_self(&self) -> Vec<u8> {
