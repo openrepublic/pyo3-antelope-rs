@@ -1,6 +1,6 @@
 [project]
 name = "pyo3-antelope-rs"
-version = "0.6.0"
+version = "0.7.0"
 description = ""
 authors = [{ name = "Guillermo Rodriguez", email = "guillermo@telos.net" }]
 requires-python = ">=3.9"
