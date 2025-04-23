@@ -46,7 +46,7 @@ dependencies = [
 [[package]]
 name = "antelope-client"
 version = "0.3.1"
-source = "git+https://github.com/openrepublic/antelope-rs.git?rev=5529f85e047f9554d9125ef0e1957a388ee5824e#5529f85e047f9554d9125ef0e1957a388ee5824e"
+source = "git+https://github.com/openrepublic/antelope-rs.git?rev=d08b017796717eb098c6ca6ec4c937ff9db3aa3a#d08b017796717eb098c6ca6ec4c937ff9db3aa3a"
 dependencies = [
  "antelope-client-macros",
  "async-trait",
@@ -1271,7 +1271,7 @@ dependencies = [
 
 [[package]]
 name = "pyo3-antelope-rs"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "antelope-client",
  "chrono",

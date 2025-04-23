@@ -77,7 +77,7 @@ impl AntelopeTypes {
             AntelopeTypes::Symbol(val) => NativeValue::Symbol(val.inner.value()),
             AntelopeTypes::Asset(val) => NativeValue::Asset(val.amount(), val.symbol().inner.value()),
             AntelopeTypes::Name(val) => NativeValue::Name(val.inner.value()),
-            AntelopeTypes::ABI(val) => NativeValue::Bytes(val.pack_self()),
+            AntelopeTypes::ABI(val) => NativeValue::Bytes(val.encode()),
         }
     }
 }

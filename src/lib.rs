@@ -20,7 +20,7 @@ use crate::proxies::{
     sym::Symbol,
     asset::Asset,
 };
-use crate::proxies::abi::ABI;
+use crate::proxies::abi::{ShipABI, ABI};
 use crate::types::PyAction;
 
 
@@ -131,7 +131,9 @@ fn antelope_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SymbolCode>()?;
     m.add_class::<Symbol>()?;
     m.add_class::<Asset>()?;
+
     m.add_class::<ABI>()?;
+    m.add_class::<ShipABI>()?;
 
     m.add("PanicException", py.get_type::<PanicException>())?;
 

@@ -1,4 +1,4 @@
-use antelope::chain::abi::ABI as NativeABI;
+use antelope::chain::abi::{ABI as NativeABI, ShipABI as NativeShipABI};
 use antelope::serializer::{Decoder, Encoder, Packer};
 use antelope::serializer::generic::decode::decode_abi_type;
 use antelope::serializer::generic::encode::encode_abi_type;
@@ -38,8 +38,61 @@ impl_packable_py! {
             String::from_utf8(buf).unwrap()
         }
 
-        pub fn pack_self(&self) -> Vec<u8> {
-            self.encode()
+        pub fn pack(&self, type_alias: &str, value: AntelopeTypes) -> PyResult<Vec<u8>> {
+            let mut encoder = Encoder::new(0);
+
+            encode_abi_type(&self.inner, type_alias, &value.into_value(), &mut encoder)
+                .map_err(|err| PyValueError::new_err(err.to_string()))?;
+
+            Ok(encoder.get_bytes().to_vec())
+        }
+
+        pub fn unpack(&self, type_alias: &str, buffer: &[u8]) -> PyResult<AntelopeTypes> {
+            let mut decoder = Decoder::new(buffer);
+
+            Ok(AntelopeTypes::Value(decode_abi_type(&self.inner, type_alias, buffer.len(), &mut decoder)
+                .map_err(|err| PyValueError::new_err(err.to_string()))?))
+        }
+
+        fn __str__(&self) -> String { self.to_string() }
+
+        fn __richcmp__(&self, other: &ABI, op: CompareOp) -> PyResult<bool> {
+            match op {
+                CompareOp::Eq => Ok(self.inner == other.inner),
+                CompareOp::Ne => Ok(self.inner != other.inner),
+                _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                    "Operation not implemented",
+                )),
+            }
+        }
+    }
+}
+
+#[pyclass]
+#[derive(Debug, Clone)]
+pub struct ShipABI {
+    pub inner: NativeShipABI,
+}
+
+impl_packable_py! {
+    impl ShipABI(NativeShipABI) {
+        #[staticmethod]
+        pub fn from_str(s: &str) -> PyResult<Self> {
+            let abi = NativeShipABI::from_string(s).map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+            Ok(ShipABI {
+                inner: abi,
+            })
+        }
+
+        pub fn to_string(&self) -> String {
+            let mut buf = Vec::new();
+            let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    "); // 4 spaces
+            let mut serializer = Serializer::with_formatter(&mut buf, formatter);
+
+            self.inner.serialize(&mut serializer).unwrap();
+
+            String::from_utf8(buf).unwrap()
         }
 
         pub fn pack(&self, type_alias: &str, value: AntelopeTypes) -> PyResult<Vec<u8>> {
@@ -60,7 +113,7 @@ impl_packable_py! {
 
         fn __str__(&self) -> String { self.to_string() }
 
-        fn __richcmp__(&self, other: &ABI, op: CompareOp) -> PyResult<bool> {
+        fn __richcmp__(&self, other: &ShipABI, op: CompareOp) -> PyResult<bool> {
             match op {
                 CompareOp::Eq => Ok(self.inner == other.inner),
                 CompareOp::Ne => Ok(self.inner != other.inner),
