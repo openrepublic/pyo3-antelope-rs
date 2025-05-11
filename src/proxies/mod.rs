@@ -3,3 +3,7 @@ pub mod sym_code;
 pub mod sym;
 pub mod asset;
 pub mod abi;
+pub mod public_key;
+pub mod private_key;
+pub mod checksums;
+pub mod signature;

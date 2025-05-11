@@ -1,7 +1,9 @@
+use std::str::FromStr;
 use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
-use antelope::chain::asset::{Symbol as NativeSymbol, SymbolError};
+use antelope::chain::asset::{Symbol as NativeSymbol};
 use antelope::serializer::Packer;
+use pyo3::exceptions::PyValueError;
 use crate::impl_packable_py;
 use crate::proxies::sym_code::SymbolCode;
 
@@ -15,18 +17,13 @@ impl_packable_py! {
     impl Symbol(NativeSymbol) {
         #[staticmethod]
         pub fn from_str(s: &str) -> PyResult<Self> {
-            match NativeSymbol::from_string(s) {
-                Ok(sym) => Ok(Symbol { inner: sym }),
-                Err(SymbolError::BadSymbolName) => {
-                    Err(pyo3::exceptions::PyValueError::new_err("Bad symbol name format"))
-                }
-                Err(SymbolError::InvalidSymbolCharacter) => {
-                    Err(pyo3::exceptions::PyValueError::new_err("Invalid symbol character"))
-                }
-                Err(SymbolError::InvalidPrecision) => {
-                    Err(pyo3::exceptions::PyValueError::new_err("Invalid symbol precision"))
-                }
-            }
+            Ok(Symbol { inner: NativeSymbol::from_str(s)
+                .map_err(|e| PyValueError::new_err(e.to_string()))? })
+        }
+
+        #[staticmethod]
+        pub fn from_int(sym: u64) -> PyResult<Self> {
+            Ok(Symbol { inner: sym.into()})
         }
 
         #[getter]
@@ -45,7 +42,7 @@ impl_packable_py! {
         }
 
         fn __str__(&self) -> String {
-            self.inner.as_string()
+            self.inner.to_string()
         }
 
         fn __int__(&self) -> u64 {

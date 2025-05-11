@@ -1,166 +1,211 @@
 use std::collections::HashMap;
-use antelope::chain::action::{Action, PermissionLevel};
-use antelope::chain::name::{Name as NativeName};
-use antelope::chain::asset::{
-    Symbol as NativeSymbol,
-    Asset as NativeAsset,
-};
-use antelope::serializer::generic::encode::encode_params;
-use antelope::serializer::generic::value::{Value as NativeValue};
+use packvm::Value;
 use pyo3::{Bound, FromPyObject, IntoPyObjectExt, PyAny, PyErr};
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::PyTypeError;
 use pyo3::types::{PyBytes, PyDict, PyList};
 use pyo3::prelude::*;
-use pyo3_tools::py_struct;
 use crate::proxies::abi::ABI;
-use crate::proxies::asset::Asset;
+use crate::proxies::asset::{Asset, ExtendedAsset};
 use crate::proxies::name::Name;
 use crate::proxies::sym::Symbol;
 use crate::proxies::sym_code::SymbolCode;
 
-py_struct!(PyPermissionLevel {
-    actor: String,
-    permission: String
-});
+// import packvm antelope conversion traits
+#[allow(unused_imports)]
+use packvm::compiler::antelope as vmantelope;
+use crate::proxies::checksums::{Checksum160, Checksum256, Checksum512};
+use crate::proxies::public_key::PublicKey;
 
-impl Into<PyResult<PermissionLevel>> for PyPermissionLevel {
-    fn into(self) -> PyResult<PermissionLevel> {
-        Ok(PermissionLevel::new(
-            NativeName::from_string(&self.actor).map_err(|e| PyValueError::new_err(e.to_string()))?,
-            NativeName::from_string(&self.permission).map_err(|e| PyValueError::new_err(e.to_string()))?,
+#[derive(Debug, Clone)]
+pub enum AntelopeTypes {
+    Sum160(Checksum160),
+    Sum256(Checksum256),
+    Sum512(Checksum512),
+
+    PublicKey(PublicKey),
+
+    SymbolCode(SymbolCode),
+    Symbol(Symbol),
+    Asset(Asset),
+    ExtendedAsset(ExtendedAsset),
+
+    Name(Name),
+
+    ABI(ABI),
+}
+
+#[derive(Debug, Clone)]
+pub enum AntelopeValue {
+    Generic(Value),
+    Antelope(AntelopeTypes),
+    List(Vec<AntelopeValue>),
+    Dict(HashMap<String, AntelopeValue>),
+}
+
+impl Default for AntelopeValue {
+    fn default() -> Self {
+        AntelopeValue::Generic(Value::None)
+    }
+}
+
+impl From<Value> for AntelopeValue {
+    fn from(value: Value) -> Self {
+        AntelopeValue::Generic(value)
+    }
+}
+
+impl From<AntelopeTypes> for Value {
+    fn from(value: AntelopeTypes) -> Self {
+        match value {
+            AntelopeTypes::Name(wrapper) => wrapper.inner.into(),
+
+            AntelopeTypes::Sum160(wrapper) => wrapper.inner.into(),
+            AntelopeTypes::Sum256(wrapper) => wrapper.inner.into(),
+            AntelopeTypes::Sum512(wrapper) => wrapper.inner.into(),
+
+            AntelopeTypes::PublicKey(wrapper) => wrapper.inner.into(),
+
+            AntelopeTypes::SymbolCode(wrapper) => wrapper.inner.into(),
+            AntelopeTypes::Symbol(wrapper) => wrapper.inner.into(),
+            AntelopeTypes::Asset(wrapper) => wrapper.inner.into(),
+            AntelopeTypes::ExtendedAsset(wrapper) => {
+                Value::Struct(HashMap::from([
+                    ("quantity".to_string(), wrapper.quantity.inner.into()),
+                    ("contract".to_string(), wrapper.contract.inner.into()),
+                ]))
+            }
+
+            AntelopeTypes::ABI(wrapper) => wrapper.inner.into(),
+        }
+    }
+}
+
+impl From<AntelopeValue> for Value {
+    fn from(value: AntelopeValue) -> Self {
+        match value {
+            AntelopeValue::Generic(value) => value,
+            AntelopeValue::Antelope(wrapper) => wrapper.into(),
+            AntelopeValue::List(list) => {
+                Value::Array(list.into_iter().map(|v| v.into()).collect())
+            },
+            AntelopeValue::Dict(dict) => {
+                Value::Struct(dict.into_iter().map(|(k, v)| (k, v.into())).collect())
+            }
+        }
+    }
+}
+
+impl<'a> FromPyObject<'a> for AntelopeValue {
+    fn extract_bound(obj: &Bound<'a, PyAny>) -> PyResult<Self> {
+        // None
+        if obj.is_none() {
+            return Ok(
+                AntelopeValue::Generic(Value::None)
+            );
+        }
+        // bool
+        if let Ok(b) = obj.extract::<bool>() {
+            return Ok(AntelopeValue::Generic(Value::Bool(b)));
+        }
+        if let Ok(u) = obj.extract::<u64>() {
+            return Ok(AntelopeValue::Generic(u.into()));
+        }
+        if let Ok(i) = obj.extract::<i64>() {
+            return Ok(AntelopeValue::Generic(i.into()));
+        }
+        // final fallback to full 128
+        if let Ok(bigu) = obj.extract::<u128>() {
+            return Ok(AntelopeValue::Generic(bigu.into()));
+        }
+        if let Ok(big) = obj.extract::<i128>() {
+            return Ok(AntelopeValue::Generic(big.into()));
+        }
+        // floats
+        if let Ok(f) = obj.extract::<f64>() {
+            return Ok(AntelopeValue::Generic(Value::Float(f.into())));
+        }
+        // bytes
+        if let Ok(pybytes) = obj.downcast::<PyBytes>() {
+            return Ok(
+                AntelopeValue::Generic(Value::Bytes(pybytes.as_bytes().to_vec()))
+            );
+        }
+        // string
+        if let Ok(s) = obj.extract::<String>() {
+            return Ok(AntelopeValue::Generic(Value::String(s)));
+        }
+        // array
+        if let Ok(seq) = obj.downcast::<pyo3::types::PySequence>() {
+            let seq_len = seq.len().unwrap_or_default();
+            let mut list = Vec::with_capacity(seq_len);
+            for i in 0..seq_len {
+                let item = seq.get_item(i)?;
+                list.push(item.extract::<AntelopeValue>()?);
+            }
+            return Ok(AntelopeValue::List(list));
+        }
+        // dict
+        if let Ok(dict) = obj.downcast::<PyDict>() {
+            let mut map = HashMap::new();
+            for (k, v) in dict {
+                let key: String = k.extract()?;
+                let value: AntelopeValue = v.extract()?;
+                map.insert(key, value);
+            }
+            return Ok(AntelopeValue::Dict(map));
+        }
+        // py wrappers
+        if let Ok(wrapper) = obj.extract::<AntelopeTypes>() {
+            return Ok(AntelopeValue::Antelope(wrapper));
+        }
+        Err(PyTypeError::new_err(
+            format!("cannot convert Python type {} to NativeValue", obj.get_type()),
         ))
     }
 }
 
-py_struct!(PyAction {
-    account: String,
-    name: String,
-    authorization: Vec<PyPermissionLevel>,
-    data: Vec<AntelopeTypes>,
-});
-
-impl PyAction {
-    pub fn into_native(self, abi: &ABI) -> PyResult<Action> {
-        let mut auths = Vec::new();
-        for auth in self.authorization {
-            let maybe_perm: PyResult<PermissionLevel> = auth.into();
-            auths.push(maybe_perm?);
-        }
-        Ok(Action {
-            account: NativeName::new_from_str(&self.account),
-            name: NativeName::new_from_str(&self.name),
-            authorization: auths,
-            data: encode_params(
-                &abi.inner,
-                &self.name,
-                &self.data.iter().map(|v| v.clone().into_value()).collect(),
-            ).map_err(|e| PyValueError::new_err(e.to_string()))?,
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum AntelopeTypes {
-    Value(NativeValue),
-    SymbolCode(SymbolCode),
-    Symbol(Symbol),
-    Asset(Asset),
-    Name(Name),
-    ABI(ABI)
-}
-
-impl AntelopeTypes {
-    pub fn into_value(self) -> NativeValue {
-        match self {
-            AntelopeTypes::Value(val) => val,
-            AntelopeTypes::SymbolCode(val) => NativeValue::SymbolCode(val.inner.value()),
-            AntelopeTypes::Symbol(val) => NativeValue::Symbol(val.inner.value()),
-            AntelopeTypes::Asset(val) => NativeValue::Asset(val.amount(), val.symbol().inner.value()),
-            AntelopeTypes::Name(val) => NativeValue::Name(val.inner.value()),
-            AntelopeTypes::ABI(val) => NativeValue::Bytes(val.encode()),
-        }
-    }
-}
-
-fn value_from_pyany(obj: &Bound<PyAny>) -> PyResult<NativeValue> {
-    // None → Null
-    if obj.is_none() {
-        return Ok(NativeValue::Null);
-    }
-    // bool
-    if let Ok(b) = obj.extract::<bool>() {
-        return Ok(NativeValue::Bool(b));
-    }
-    // try the integer ranges first
-    if let Ok(i) = obj.extract::<i8>()   { return Ok(NativeValue::Int8(i)); }
-    if let Ok(i) = obj.extract::<i16>()  { return Ok(NativeValue::Int16(i)); }
-    if let Ok(i) = obj.extract::<i32>()  { return Ok(NativeValue::Int32(i)); }
-    if let Ok(i) = obj.extract::<i64>()  { return Ok(NativeValue::Int64(i)); }
-    // final fallback to full i128
-    if let Ok(big) = obj.extract::<i128>() {
-        return Ok(NativeValue::Int128(big));
-    }
-    // unsigned
-    if let Ok(u) = obj.extract::<u8>()   { return Ok(NativeValue::Uint8(u)); }
-    if let Ok(u) = obj.extract::<u16>()  { return Ok(NativeValue::Uint16(u)); }
-    if let Ok(u) = obj.extract::<u32>()  { return Ok(NativeValue::Uint32(u)); }
-    if let Ok(u) = obj.extract::<u64>()  { return Ok(NativeValue::Uint64(u)); }
-    if let Ok(bigu) = obj.extract::<u128>() {
-        return Ok(NativeValue::Uint128(bigu));
-    }
-    // floats
-    if let Ok(f) = obj.extract::<f32>()  { return Ok(NativeValue::Float32(f)); }
-    if let Ok(f) = obj.extract::<f64>()  { return Ok(NativeValue::Float64(f)); }
-    // bytes
-    if let Ok(pybytes) = obj.downcast::<PyBytes>() {
-        return Ok(NativeValue::Bytes(pybytes.as_bytes().to_vec()));
-    }
-    // string
-    if let Ok(s) = obj.extract::<String>() {
-        return Ok(NativeValue::String(s));
-    }
-    // array
-    if let Ok(seq) = obj.downcast::<pyo3::types::PySequence>() {
-        let mut vec = Vec::with_capacity(seq.len().unwrap_or(0) as usize);
-        for idx in 0..seq.len()? {
-            let item = seq.get_item(idx)?;
-            vec.push(value_from_pyany(&item)?);
-        }
-        return Ok(NativeValue::Array(vec));
-    }
-    // dict → Struct
-    if let Ok(dict) = obj.downcast::<PyDict>() {
-        let mut map = HashMap::new();
-        for (k, v) in dict {
-            let key: String = k.extract()?;
-            map.insert(key, value_from_pyany(&v)?);
-        }
-        return Ok(NativeValue::Struct(map));
-    }
-    Err(PyErr::new::<PyTypeError, _>(
-        format!("cannot convert Python type {} to NativeValue", obj.get_type()),
-    ))
-}
-
 impl<'a> FromPyObject<'a> for AntelopeTypes {
-    fn extract_bound(ob: &Bound<'a, PyAny>) -> PyResult<Self> {
-        if let Ok(py_name) = ob.extract::<Name>() {
+    fn extract_bound(obj: &Bound<'a, PyAny>) -> PyResult<Self> {
+        // py wrappers
+        if let Ok(py_name) = obj.extract::<Name>() {
             return Ok(AntelopeTypes::Name(py_name));
         }
 
-        if let Ok(py_sym_code) = ob.extract::<SymbolCode>() {
+        if let Ok(py_key) = obj.extract::<PublicKey>() {
+            return Ok(AntelopeTypes::PublicKey(py_key));
+        }
+
+        if let Ok(py_sym_code) = obj.extract::<SymbolCode>() {
             return Ok(AntelopeTypes::SymbolCode(py_sym_code));
         }
 
-        if let Ok(py_sym) = ob.extract::<Symbol>() {
+        if let Ok(py_sym) = obj.extract::<Symbol>() {
             return Ok(AntelopeTypes::Symbol(py_sym));
         }
 
-        if let Ok(py_asset) = ob.extract::<Asset>() {
+        if let Ok(py_asset) = obj.extract::<Asset>() {
             return Ok(AntelopeTypes::Asset(py_asset));
         }
 
-        Ok(AntelopeTypes::Value(value_from_pyany(ob)?))
+        if let Ok(py_ext_asset) = obj.extract::<ExtendedAsset>() {
+            return Ok(AntelopeTypes::ExtendedAsset(py_ext_asset));
+        }
+
+        if let Ok(py_sum_160) = obj.extract::<Checksum160>() {
+            return Ok(AntelopeTypes::Sum160(py_sum_160));
+        }
+
+        if let Ok(py_sum_256) = obj.extract::<Checksum256>() {
+            return Ok(AntelopeTypes::Sum256(py_sum_256));
+        }
+
+        if let Ok(py_sum_512) = obj.extract::<Checksum512>() {
+            return Ok(AntelopeTypes::Sum512(py_sum_512));
+        }
+
+        Err(PyTypeError::new_err(
+            format!("cannot convert Python type {} to AntelopeTypes", obj.get_type()),
+        ))
     }
 }
 
@@ -171,49 +216,47 @@ impl<'py> IntoPyObject<'py> for AntelopeTypes {
 
     fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         match self {
-            AntelopeTypes::Value(val) => {
-               match val {
-                   NativeValue::Null => Ok(py.None().into_bound_py_any(py)?),
-                   NativeValue::Bool(b) => Ok(b.into_bound_py_any(py)?),
-                   NativeValue::Int8(num) => Ok(num.into_bound_py_any(py)?),
-                   NativeValue::Int16(num) => Ok(num.into_bound_py_any(py)?),
-                   NativeValue::Int32(num) => Ok(num.into_bound_py_any(py)?),
-                   NativeValue::Int64(num) => Ok(num.into_bound_py_any(py)?),
-                   NativeValue::Int128(num) => Ok(num.into_bound_py_any(py)?),
-                   NativeValue::Uint8(num) => Ok(num.into_bound_py_any(py)?),
-                   NativeValue::Uint16(num) => Ok(num.into_bound_py_any(py)?),
-                   NativeValue::Uint32(num) => Ok(num.into_bound_py_any(py)?),
-                   NativeValue::Uint64(num) => Ok(num.into_bound_py_any(py)?),
-                   NativeValue::Uint128(num) => Ok(num.into_bound_py_any(py)?),
-                   NativeValue::Float32(num) => Ok(num.into_bound_py_any(py)?),
-                   NativeValue::Float64(num) => Ok(num.into_bound_py_any(py)?),
-                   NativeValue::String(s) => Ok(s.into_bound_py_any(py)?),
-                   NativeValue::Bytes(bytes) => Ok(bytes.into_bound_py_any(py)?),
-                   NativeValue::Array(values) => {
-                       let py_list = PyList::empty(py);
-                       for val in values {
-                           py_list.append(AntelopeTypes::Value(val).into_pyobject(py)?)?
-                       }
-                       Ok(py_list.into_any())
-                   }
-                   NativeValue::Struct(obj) => {
-                       let py_dict = PyDict::new(py);
-                       for (k, v) in obj {
-                           py_dict.set_item(k, AntelopeTypes::Value(v))?
-                       }
-                       Ok(py_dict.into_any())
-                   }
-                   NativeValue::Name(name) => Ok(NativeName::from_u64(name).to_string().into_bound_py_any(py)?),
-                   NativeValue::Symbol(sym) => Ok(NativeSymbol::from_value(sym).to_string().into_bound_py_any(py)?),
-                   NativeValue::SymbolCode(sym_code) => Ok(NativeSymbol::from_value(sym_code).to_string().into_bound_py_any(py)?),
-                   NativeValue::Asset(amount, sym) => Ok(NativeAsset::new(amount, NativeSymbol::from_value(sym)).to_string().into_bound_py_any(py)?),
-               }
+            AntelopeTypes::Name(wrapper) => wrapper.into_bound_py_any(py),
+
+            AntelopeTypes::Sum160(wrapper) => wrapper.into_bound_py_any(py),
+            AntelopeTypes::Sum256(wrapper) => wrapper.into_bound_py_any(py),
+            AntelopeTypes::Sum512(wrapper) => wrapper.into_bound_py_any(py),
+
+            AntelopeTypes::PublicKey(wrapper) => wrapper.into_bound_py_any(py),
+
+            AntelopeTypes::SymbolCode(wrapper) => wrapper.into_bound_py_any(py),
+            AntelopeTypes::Symbol(wrapper) => wrapper.into_bound_py_any(py),
+            AntelopeTypes::Asset(wrapper) => wrapper.into_bound_py_any(py),
+            AntelopeTypes::ExtendedAsset(wrapper) => wrapper.into_bound_py_any(py),
+
+            AntelopeTypes::ABI(wrapper) => wrapper.into_bound_py_any(py),
+        }
+    }
+}
+
+impl<'py> IntoPyObject<'py> for AntelopeValue {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        match self {
+            AntelopeValue::Generic(val) => val.into_bound_py_any(py),
+            AntelopeValue::Antelope(wrapper) => wrapper.into_pyobject(py),
+            AntelopeValue::List(list) => {
+                let py_list = PyList::empty(py);
+                for val in list {
+                    py_list.append(val.into_pyobject(py)?)?
+                }
+                Ok(py_list.into_any())
             },
-            AntelopeTypes::SymbolCode(obj) => Ok(obj.into_bound_py_any(py)?),
-            AntelopeTypes::Symbol(obj) => Ok(obj.into_bound_py_any(py)?),
-            AntelopeTypes::Asset(obj) => Ok(obj.into_bound_py_any(py)?),
-            AntelopeTypes::Name(obj) => Ok(obj.into_bound_py_any(py)?),
-            AntelopeTypes::ABI(obj) => Ok(obj.into_bound_py_any(py)?),
+            AntelopeValue::Dict(dict) => {
+                let py_dict = PyDict::new(py);
+                for (k, v) in dict {
+                    py_dict.set_item(k, v)?
+                }
+                Ok(py_dict.into_any())
+            }
         }
     }
 }
@@ -228,27 +271,27 @@ macro_rules! impl_packable_py {
     ) => {
         #[pymethods]
         impl $wrapper {
-            /// Build an instance from raw bytes.
+            // build an instance from raw bytes.
             #[staticmethod]
             pub fn from_bytes(
                 buffer: &[u8]
             ) -> ::pyo3::PyResult<Self>
             {
-                let mut decoder = antelope::serializer::Decoder::new(buffer);
+                let mut decoder = ::antelope::serializer::Decoder::new(buffer);
                 let mut inner: $inner =
                     ::core::default::Default::default();
-                decoder.unpack(&mut inner);
+                decoder.unpack(&mut inner)
+                    .map_err(|e| ::pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
                 Ok(Self { inner })
             }
 
-            /// Encode the wrapped value back into bytes.
+            // encode the wrapped value back into bytes.
             pub fn encode(&self) -> ::std::vec::Vec<u8> {
-                let mut encoder = antelope::serializer::Encoder::new(0);
+                let mut encoder = ::antelope::serializer::Encoder::new(0);
                 self.inner.pack(&mut encoder);
                 encoder.get_bytes().to_vec()
             }
 
-            // ---------- user‑supplied items ----------
             $($rest)*
         }
     };

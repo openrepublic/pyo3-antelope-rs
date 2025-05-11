@@ -23,6 +23,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             openssl libssl-dev build-essential
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v5
       - name: Create env
@@ -53,6 +58,11 @@ jobs:
             wheel_tag: macos
     steps:
       - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v5
       - name: Create env
