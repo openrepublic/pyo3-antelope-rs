@@ -46,7 +46,6 @@ dependencies = [
 [[package]]
 name = "antelope-client"
 version = "0.4.0"
-source = "git+https://github.com/openrepublic/antelope-rs.git?rev=1f3fe8c45cf9674f45c612cf2358987a0d84d1b4#1f3fe8c45cf9674f45c612cf2358987a0d84d1b4"
 dependencies = [
  "antelope-client-macros",
  "async-trait",
@@ -59,6 +58,7 @@ dependencies = [
  "hex",
  "k256",
  "log",
+ "once_cell",
  "p256",
  "rand",
  "reqwest",
@@ -76,7 +76,6 @@ dependencies = [
 [[package]]
 name = "antelope-client-macros"
 version = "0.2.0"
-source = "git+https://github.com/openrepublic/antelope-rs.git?rev=1f3fe8c45cf9674f45c612cf2358987a0d84d1b4#1f3fe8c45cf9674f45c612cf2358987a0d84d1b4"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -143,12 +142,6 @@ name = "base64ct"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
-
-[[package]]
-name = "bimap"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "230c5f1ca6a325a32553f8640d31ac9b49f2411e901e427570154868b46da4f7"
 
 [[package]]
 name = "bitflags"
@@ -1129,18 +1122,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "packvm"
-version = "0.1.0-alpha"
-source = "git+https://github.com/guilledk/packvm.git?rev=cc487e20a218ad9e7679b0eb1d9a656a2ae70701#cc487e20a218ad9e7679b0eb1d9a656a2ae70701"
-dependencies = [
- "antelope-client",
- "bimap",
- "pyo3",
- "tailcall",
- "thiserror",
-]
-
-[[package]]
 name = "parking_lot"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1293,7 +1274,6 @@ version = "0.10.0"
 dependencies = [
  "antelope-client",
  "chrono",
- "packvm",
  "pyo3",
  "pyo3-log",
  "pyo3-tools",
@@ -1683,9 +1663,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.10.8"
+version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "793db75ad2bcafc3ffa7c68b215fee268f537982cd901d132f89c6343f3a3dc8"
+checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
 dependencies = [
  "cfg-if",
  "cpufeatures",
@@ -1828,26 +1808,6 @@ checksum = "a75fb188eb626b924683e3b95e3a48e63551fcfb51949de2f06a9d91dbee93c9"
 dependencies = [
  "core-foundation-sys",
  "libc",
-]
-
-[[package]]
-name = "tailcall"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "695cb8728beab065fe29d03ae105a23c7cdd6e8d9ed5fd717a0bbbd8c56ab0bb"
-dependencies = [
- "tailcall-impl",
-]
-
-[[package]]
-name = "tailcall-impl"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10b7bf224f4cbce8706b34f6fd1db63bc9b1fa933a3b9e6eee2e78a660416e13"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]

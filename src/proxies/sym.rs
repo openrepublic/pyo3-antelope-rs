@@ -1,11 +1,11 @@
-use std::str::FromStr;
-use pyo3::basic::CompareOp;
-use pyo3::prelude::*;
-use antelope::chain::asset::{Symbol as NativeSymbol};
-use antelope::serializer::Packer;
-use pyo3::exceptions::PyValueError;
 use crate::impl_packable_py;
 use crate::proxies::sym_code::SymbolCode;
+use antelope::chain::asset::Symbol as NativeSymbol;
+use antelope::serializer::Packer;
+use pyo3::basic::CompareOp;
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+use std::str::FromStr;
 
 #[pyclass]
 #[derive(Debug, Clone)]

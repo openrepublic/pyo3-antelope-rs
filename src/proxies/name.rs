@@ -1,13 +1,11 @@
+use crate::impl_packable_py;
+use antelope::chain::name::Name as NativeName;
+use antelope::serializer::Packer;
+use pyo3::basic::CompareOp;
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
-use antelope::serializer::Packer;
-use antelope::chain::name::{Name as NativeName};
-use packvm::Value;
-use pyo3::basic::CompareOp;
-use pyo3::exceptions::{PyTypeError, PyValueError};
-use pyo3::prelude::*;
-use crate::impl_packable_py;
-use crate::types::{AntelopeTypes, AntelopeValue};
 
 #[pyclass]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -70,39 +68,5 @@ impl_packable_py! {
 impl Display for Name {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.inner.to_string())
-    }
-}
-
-impl TryFrom<&Value> for Name {
-    type Error = PyErr;
-
-    fn try_from(value: &Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::String(s) => Name::from_str(&s),
-            Value::Int(int) => {
-                let num = int.as_u64()
-                    .ok_or(PyValueError::new_err(format!("Cant cast {:?} to u64", int)))?;
-
-                Name::from_int(num)
-            }
-            _ => Err(PyTypeError::new_err(format!("Cant convert {:?} to Name", value))),
-        }
-    }
-}
-
-impl TryFrom<&AntelopeValue> for Name {
-    type Error = PyErr;
-
-    fn try_from(value: &AntelopeValue) -> Result<Self, Self::Error> {
-        match value {
-            AntelopeValue::Generic(val) => val.try_into(),
-            AntelopeValue::Antelope(wrapper) => {
-                match wrapper {
-                    AntelopeTypes::Name(name) => Ok(name.clone()),
-                    _ => Err(PyTypeError::new_err(format!("Can not convert {:?} to Name", wrapper)))
-                }
-            }
-            _ => Err(PyTypeError::new_err(format!("Can not convert {:?} to Name", value)))
-        }
     }
 }

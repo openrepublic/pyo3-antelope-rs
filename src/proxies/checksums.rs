@@ -1,13 +1,11 @@
-use pyo3::prelude::*;
+use crate::impl_packable_py;
 use antelope::chain::checksum::{
-    Checksum160 as NativeSum160,
-    Checksum256 as NativeSum256,
-    Checksum512 as NativeSum512,
+    Checksum160 as NativeSum160, Checksum256 as NativeSum256, Checksum512 as NativeSum512,
 };
 use antelope::serializer::Packer;
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
-use crate::impl_packable_py;
+use pyo3::prelude::*;
 
 #[pyclass]
 #[derive(Debug, Clone)]
