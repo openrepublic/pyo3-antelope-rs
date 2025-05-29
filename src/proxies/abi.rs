@@ -1,61 +1,15 @@
 use antelope::chain::abi::{
-    ABIResolvedType, ABITypeResolver, ShipABI as NativeShipABI, ABI as NativeABI, AbiTableView
+    ABITypeResolver,
+    ShipABI as NativeShipABI,
+    ABI as NativeABI, AbiTableView
 };
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyValueError, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 use serde::ser::Serialize;
 use serde_json::Serializer;
-
-fn resolved_type_to_dict(
-    py: Python,
-    resolved: ABIResolvedType,
-) -> PyResult<Bound<PyDict>> {
-    let dict = PyDict::new(py);
-    match resolved {
-        ABIResolvedType::Standard(std) => {
-            dict.set_item("type", "standard")?;
-            dict.set_item("name", std)?;
-        }
-        ABIResolvedType::Variant(meta) => {
-            dict.set_item("type", "variant")?;
-            dict.set_item("name", meta.name)?;
-            dict.set_item("types", meta.types)?;
-        }
-        ABIResolvedType::Struct(meta) => {
-            dict.set_item("type", "struct")?;
-            dict.set_item("name", meta.name)?;
-            dict.set_item("base", meta.base)?;
-            let mut fields = Vec::with_capacity(meta.fields.len());
-            for f in meta.fields.iter() {
-                let field = PyDict::new(py);
-                field.set_item("name", f.name.clone())?;
-                field.set_item("type", f.r#type.clone())?;
-                fields.push(field);
-            }
-            dict.set_item("fields", fields)?;
-        }
-        ABIResolvedType::Alias(inner) => {
-            dict.set_item("type", "alias")?;
-            dict.set_item("inner", resolved_type_to_dict(py, *inner)?)?;
-        }
-        ABIResolvedType::Optional(inner) => {
-            dict.set_item("type", "optional")?;
-            dict.set_item("inner", resolved_type_to_dict(py, *inner)?)?;
-        }
-        ABIResolvedType::Extension(inner) => {
-            dict.set_item("type", "extension")?;
-            dict.set_item("inner", resolved_type_to_dict(py, *inner)?)?;
-        }
-        ABIResolvedType::Array(inner) => {
-            dict.set_item("type", "array")?;
-            dict.set_item("item", resolved_type_to_dict(py, *inner)?)?;
-        }
-    };
-    Ok(dict)
-}
 
 macro_rules! define_pyabi {
     ($wrapper:ident, $inner:path) => {
@@ -90,7 +44,7 @@ macro_rules! define_pyabi {
             }
 
             #[getter]
-            pub fn types<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+            pub fn _types<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
                 let mut ret = Vec::new();
                 for t in self.inner.types.iter() {
                     let d = PyDict::new(py);
@@ -102,7 +56,7 @@ macro_rules! define_pyabi {
             }
 
             #[getter]
-            pub fn structs<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+            pub fn _structs<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
                 let mut ret = Vec::new();
                 for s in self.inner.structs.iter() {
                     let d = PyDict::new(py);
@@ -122,7 +76,7 @@ macro_rules! define_pyabi {
             }
 
             #[getter]
-            pub fn variants<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+            pub fn _variants<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
                 let mut ret = Vec::new();
                 for v in self.inner.variants.iter() {
                     let d = PyDict::new(py);
@@ -134,7 +88,7 @@ macro_rules! define_pyabi {
             }
 
             #[getter]
-            pub fn actions<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+            pub fn _actions<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
                 let mut ret = Vec::new();
                 for a in self.inner.actions.iter() {
                     let d = PyDict::new(py);
@@ -147,7 +101,7 @@ macro_rules! define_pyabi {
             }
 
             #[getter]
-            pub fn tables<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+            pub fn _tables<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
                 let mut ret = Vec::new();
                 for t in self.inner.tables.iter() {
                     let d = PyDict::new(py);
@@ -159,6 +113,24 @@ macro_rules! define_pyabi {
                     ret.push(d);
                 }
                 Ok(ret)
+            }
+
+            fn resolve_type<'py>(&self, py: Python<'py>, t: &str) -> PyResult<Bound<'py, PyDict>> {
+                let res = self.inner.resolve_type(t).map_err(|e| PyTypeError::new_err(e.to_string()))?;
+                let dict = PyDict::new(py);
+
+                dict.set_item("original_name".to_string(), res.original_name)?;
+                dict.set_item("resolved_name".to_string(), res.resolved_name)?;
+                dict.set_item("is_std".to_string(), res.is_std)?;
+                dict.set_item("is_alias".to_string(), res.is_alias)?;
+                dict.set_item("is_variant".to_string(), res.is_variant)?;
+                dict.set_item("is_struct".to_string(), res.is_struct)?;
+                dict.set_item(
+                    "modifiers".to_string(),
+                    PyList::new(py, res.modifiers.iter().map(|tm| tm.as_str()))?
+                )?;
+
+                Ok(dict)
             }
 
             pub fn to_string(&self) -> String {
@@ -173,15 +145,6 @@ macro_rules! define_pyabi {
                 let mut encoder = Encoder::new(0);
                 self.inner.pack(&mut encoder);
                 encoder.get_bytes().to_vec()
-            }
-
-            pub fn resolve_type<'py>(
-                &self,
-                py: Python<'py>,
-                type_name: &str,
-            ) -> PyResult<Bound<'py, PyDict>> {
-                let resolved = self.inner.resolve_type(type_name).map_err(|e| PyValueError::new_err(e.to_string()))?;
-                return Ok(resolved_type_to_dict(py, resolved)?);
             }
 
             fn __str__(&self) -> String {

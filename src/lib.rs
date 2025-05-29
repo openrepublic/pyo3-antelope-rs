@@ -7,10 +7,11 @@ use antelope::chain::action::Action;
 use antelope::chain::time::TimePointSec;
 use antelope::chain::transaction::{CompressionType, PackedTransaction, SignedTransaction, Transaction, TransactionHeader};
 use antelope::chain::varint::VarUint32;
+use antelope::chain::abi::BUILTIN_TYPES;
 use antelope::util::bytes_to_hex;
 use pyo3::panic::PanicException;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyFrozenSet};
 use crate::proxies::{
     name::Name,
     sym_code::SymbolCode,
@@ -44,7 +45,7 @@ fn sign_tx(
         max_cpu_usage_ms,
         delay_sec: VarUint32::new(0),
     };
-    
+
     let mut _actions: Vec<Action> = Vec::with_capacity(actions.len());
     for action in actions.iter() {
         let act: PyResult<Action> = action.into();
@@ -89,8 +90,14 @@ fn sign_tx(
 }
 
 #[pymodule]
-fn antelope_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _lowlevel(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     pyo3_log::init();
+    let py_builtin_types = PyFrozenSet::new(
+        py,
+        BUILTIN_TYPES.iter()
+    )?;
+
+    m.add("builtin_types", py_builtin_types)?;
 
     // pack/unpack
     m.add_function(wrap_pyfunction!(sign_tx, m)?)?;

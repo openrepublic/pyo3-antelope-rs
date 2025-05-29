@@ -46,6 +46,7 @@ dependencies = [
 [[package]]
 name = "antelope-client"
 version = "0.4.0"
+source = "git+https://github.com/openrepublic/antelope-rs.git?rev=a350644ce529016eef4bde4281ca2886c03e0b51#a350644ce529016eef4bde4281ca2886c03e0b51"
 dependencies = [
  "antelope-client-macros",
  "async-trait",
@@ -76,6 +77,7 @@ dependencies = [
 [[package]]
 name = "antelope-client-macros"
 version = "0.2.0"
+source = "git+https://github.com/openrepublic/antelope-rs.git?rev=a350644ce529016eef4bde4281ca2886c03e0b51#a350644ce529016eef4bde4281ca2886c03e0b51"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1250,6 +1252,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "py-antelope-rs-lowlevel"
+version = "0.10.0"
+dependencies = [
+ "antelope-client",
+ "chrono",
+ "pyo3",
+ "pyo3-log",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "pyo3"
 version = "0.23.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1266,20 +1281,6 @@ dependencies = [
  "pyo3-macros",
  "rust_decimal",
  "unindent",
-]
-
-[[package]]
-name = "pyo3-antelope-rs"
-version = "0.10.0"
-dependencies = [
- "antelope-client",
- "chrono",
- "pyo3",
- "pyo3-log",
- "pyo3-tools",
- "rust_decimal",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -1337,11 +1338,6 @@ dependencies = [
  "quote",
  "syn 2.0.98",
 ]
-
-[[package]]
-name = "pyo3-tools"
-version = "0.1.0"
-source = "git+https://github.com/guilledk/pyo3-tools.git?branch=master#94c6ada899da6f97b7533eaee5aa195be53be6e2"
 
 [[package]]
 name = "quote"
