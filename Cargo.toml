@@ -1,24 +1,24 @@
 [package]
-name = "pyo3-antelope-rs"
-version = "0.10.0"
+name    = "py-antelope-rs-lowlevel"
+version = "1.0.0"
 edition = "2021"
 
+include = [
+    "src/**",
+    "pysrc/**",
+    "pyproject.toml",
+    "Cargo.toml",
+    "README.md",
+]
+
 [lib]
-name = "antelope_rs"
-# "cdylib" is necessary to produce a shared library for Python to import from.
-#
-# Downstream Rust code (including code in `bin/`, `examples/`, and `tests/`) will not be able
-# to `use string_sum;` unless the "rlib" or "lib" crate type is also included, e.g.:
-# crate-type = ["cdylib", "rlib"]
+name = "_lowlevel"
 crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.23.5", features = ["extension-module", "abi3-py39", "rust_decimal"]}
-pyo3-tools = { git = "https://github.com/guilledk/pyo3-tools.git", branch = "master"}
-antelope-client = { git = "https://github.com/openrepublic/antelope-rs.git", rev = "1f3fe8c45cf9674f45c612cf2358987a0d84d1b4" }
+antelope-client = { git = "https://github.com/openrepublic/antelope-rs.git", rev = "a350644ce529016eef4bde4281ca2886c03e0b51" }
 # antelope-client = { path = "../antelope-rs/crates/antelope" }
-# packvm = { path = "../packvm/crates/vm", features = ["python"] }
-packvm = { git = "https://github.com/guilledk/packvm.git", rev = "cc487e20a218ad9e7679b0eb1d9a656a2ae70701", features = ["python"] }
 chrono = "0.4.39"
 pyo3-log = "0.12.1"
 rust_decimal = "1.36.0"

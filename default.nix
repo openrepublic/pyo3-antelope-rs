@@ -1,6 +1,7 @@
 { pkgs ? import <nixpkgs> {} }:
 let
   nativeBuildInputs = with pkgs; [
+    rust-analyzer
     openssl pkg-config
     stdenv.cc.cc.lib
     uv

@@ -1,20 +1,16 @@
-use std::fmt::Display;
-use std::str::FromStr;
-use pyo3::basic::CompareOp;
-use pyo3::prelude::*;
-use antelope::chain::asset::{
-    Asset as NativeAsset,
-    Symbol as NativeSymbol,
-    ExtendedAsset as NativeExtAsset,
-};
-use antelope::serializer::Packer;
-use packvm::Value;
-use pyo3::exceptions::{PyTypeError, PyValueError};
-use rust_decimal::Decimal;
-use crate::proxies::sym::Symbol;
 use crate::impl_packable_py;
 use crate::proxies::name::Name;
-use crate::types::{AntelopeTypes, AntelopeValue};
+use crate::proxies::sym::Symbol;
+use antelope::chain::asset::{
+    Asset as NativeAsset, ExtendedAsset as NativeExtAsset, Symbol as NativeSymbol,
+};
+use antelope::serializer::Packer;
+use pyo3::basic::CompareOp;
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+use rust_decimal::Decimal;
+use std::fmt::Display;
+use std::str::FromStr;
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct Asset {
@@ -124,34 +120,6 @@ impl Display for Asset {
     }
 }
 
-impl TryFrom<&Value> for Asset {
-    type Error = PyErr;
-
-    fn try_from(value: &Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::String(s) => Asset::from_str(&s),
-            _ => Err(PyTypeError::new_err(format!("Cant convert {:?} to Asset", value))),
-        }
-    }
-}
-
-impl TryFrom<&AntelopeValue> for Asset {
-    type Error = PyErr;
-
-    fn try_from(value: &AntelopeValue) -> Result<Self, Self::Error> {
-        match value {
-            AntelopeValue::Generic(val) => val.try_into(),
-            AntelopeValue::Antelope(wrapper) => {
-                match wrapper {
-                    AntelopeTypes::Asset(asset) => Ok(asset.clone()),
-                    _ => Err(PyTypeError::new_err(format!("Can not convert {:?} to Asset", wrapper)))
-                }
-            }
-            _ => Err(PyTypeError::new_err(format!("Can not convert {:?} to Asset", value)))
-        }
-    }
-}
-
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct ExtendedAsset {
@@ -163,7 +131,7 @@ impl From<&ExtendedAsset> for NativeExtAsset {
     fn from(value: &ExtendedAsset) -> Self {
         NativeExtAsset {
             quantity: value.quantity.inner,
-            contract: value.contract.inner
+            contract: value.contract.inner,
         }
     }
 }
@@ -172,11 +140,14 @@ impl From<&ExtendedAsset> for NativeExtAsset {
 impl ExtendedAsset {
     #[staticmethod]
     fn from_str(s: &str) -> PyResult<Self> {
-        let ext = NativeExtAsset::try_from(s)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let ext = NativeExtAsset::try_from(s).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(ExtendedAsset {
-            quantity: Asset { inner: ext.quantity },
-            contract: Name { inner: ext.contract },
+            quantity: Asset {
+                inner: ext.quantity,
+            },
+            contract: Name {
+                inner: ext.contract,
+            },
         })
     }
 
@@ -185,50 +156,34 @@ impl ExtendedAsset {
     }
 
     fn __add__(&self, other: &ExtendedAsset) -> PyResult<ExtendedAsset> {
-        let result = self.quantity.inner.try_add(other.quantity.inner)
+        let result = self
+            .quantity
+            .inner
+            .try_add(other.quantity.inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
-        Ok(ExtendedAsset {quantity: Asset { inner: result }, contract: other.contract.clone()})
+        Ok(ExtendedAsset {
+            quantity: Asset { inner: result },
+            contract: other.contract.clone(),
+        })
     }
 
     fn __sub__(&self, other: &ExtendedAsset) -> PyResult<ExtendedAsset> {
-        let result = self.quantity.inner.try_sub(other.quantity.inner)
+        let result = self
+            .quantity
+            .inner
+            .try_sub(other.quantity.inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
-        Ok(ExtendedAsset {quantity: Asset { inner: result }, contract: other.contract.clone()})
+        Ok(ExtendedAsset {
+            quantity: Asset { inner: result },
+            contract: other.contract.clone(),
+        })
     }
 }
 
 impl Display for ExtendedAsset {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Into::<NativeExtAsset>::into(self).to_string())
-    }
-}
-
-impl TryFrom<&Value> for ExtendedAsset {
-    type Error = PyErr;
-
-    fn try_from(value: &Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::String(s) => ExtendedAsset::from_str(&s),
-            _ => Err(PyTypeError::new_err(format!("Cant convert {:?} to ExtendedAsset", value))),
-        }
-    }
-}
-
-impl TryFrom<&AntelopeValue> for ExtendedAsset {
-    type Error = PyErr;
-
-    fn try_from(value: &AntelopeValue) -> Result<Self, Self::Error> {
-        match value {
-            AntelopeValue::Generic(val) => val.try_into(),
-            AntelopeValue::Antelope(wrapper) => {
-                match wrapper {
-                    AntelopeTypes::ExtendedAsset(asset) => Ok(asset.clone()),
-                    _ => Err(PyTypeError::new_err(format!("Can not convert {:?} to ExtendedAsset", wrapper)))
-                }
-            }
-            _ => Err(PyTypeError::new_err(format!("Can not convert {:?} to ExtendedAsset", value)))
-        }
     }
 }

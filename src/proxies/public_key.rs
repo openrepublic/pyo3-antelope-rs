@@ -1,12 +1,12 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use crate::impl_packable_py;
+use crate::proxies::private_key::PrivateKey;
 use antelope::chain::key_type::KeyTypeTrait;
+use antelope::chain::public_key::PublicKey as NativePublicKey;
 use antelope::serializer::Packer;
-use antelope::chain::public_key::{PublicKey as NativePublicKey};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use crate::impl_packable_py;
-use crate::proxies::private_key::PrivateKey;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -53,6 +53,8 @@ impl_packable_py! {
 
 impl From<&PrivateKey> for PublicKey {
     fn from(value: &PrivateKey) -> Self {
-        Self { inner: value.inner.to_public() }
+        Self {
+            inner: value.inner.to_public(),
+        }
     }
 }

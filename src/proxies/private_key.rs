@@ -1,11 +1,11 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-use antelope::chain::key_type::{KeyType, KeyTypeTrait};
-use antelope::serializer::{Encoder, Packer};
-use antelope::chain::private_key::{PrivateKey as NativePrivateKey};
-use pyo3::basic::CompareOp;
-use pyo3::exceptions::{PyValueError};
-use pyo3::prelude::*;
 use crate::proxies::public_key::PublicKey;
+use antelope::chain::key_type::{KeyType, KeyTypeTrait};
+use antelope::chain::private_key::PrivateKey as NativePrivateKey;
+use antelope::serializer::{Encoder, Packer};
+use pyo3::basic::CompareOp;
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -17,19 +17,19 @@ pub struct PrivateKey {
 impl PrivateKey {
     #[staticmethod]
     fn from_str(s: &str) -> PyResult<Self> {
-        Ok(PrivateKey{
+        Ok(PrivateKey {
             inner: NativePrivateKey::try_from(s)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?
+                .map_err(|e| PyValueError::new_err(e.to_string()))?,
         })
     }
 
     #[staticmethod]
     fn from_bytes(raw: &[u8]) -> PyResult<Self> {
-        let key_type = KeyType::from_index(raw[0])
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let key_type =
+            KeyType::from_index(raw[0]).map_err(|e| PyValueError::new_err(e.to_string()))?;
 
-        Ok(PrivateKey{
-            inner: NativePrivateKey::from_bytes(raw[1..].to_vec(), key_type)
+        Ok(PrivateKey {
+            inner: NativePrivateKey::from_bytes(raw[1..].to_vec(), key_type),
         })
     }
 
@@ -41,7 +41,7 @@ impl PrivateKey {
         let inner = NativePrivateKey::random(key_type)
             .map_err(|e| PyValueError::new_err(format!("Invalid key format {}", e)))?;
 
-        Ok(PrivateKey{inner})
+        Ok(PrivateKey { inner })
     }
 
     pub fn value(&self) -> &[u8] {
