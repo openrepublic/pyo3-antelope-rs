@@ -89,8 +89,8 @@ fn sign_tx(
     })
 }
 
-#[pymodule]
-fn _lowlevel(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+#[pymodule(name="_lowlevel")]
+fn antelope_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     pyo3_log::init();
     let py_builtin_types = PyFrozenSet::new(
         py,

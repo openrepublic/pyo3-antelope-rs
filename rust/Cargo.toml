@@ -1,15 +1,15 @@
 [package]
-name    = "py-antelope-rs-lowlevel"
+name    = "pyo3-antelope-rs"
 version = "1.0.0"
 edition = "2021"
 
-include = [
-    "src/**",
-    "pysrc/**",
-    "pyproject.toml",
-    "Cargo.toml",
-    "README.md",
-]
+# include = [
+#     "src/**",
+#     "pysrc/**",
+#     "pyproject.toml",
+#     "Cargo.toml",
+#     "README.md",
+# ]
 
 [lib]
 name = "_lowlevel"

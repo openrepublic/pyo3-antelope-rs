@@ -1,4 +1,8 @@
 .idea
 target
 **/__pycache__
+
+# linux & macos
 **/*.so
+# windows
+**/*.pyd
