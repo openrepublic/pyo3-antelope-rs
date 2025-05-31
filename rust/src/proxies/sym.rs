@@ -32,7 +32,7 @@ impl_packable_py! {
         }
 
         #[getter]
-        pub fn precision(&self) -> usize {
+        pub fn precision(&self) -> u8 {
             self.inner.precision()
         }
 

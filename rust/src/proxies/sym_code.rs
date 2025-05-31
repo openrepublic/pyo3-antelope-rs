@@ -28,7 +28,7 @@ impl_packable_py! {
 
         #[getter]
         pub fn value(&self) -> u64 {
-            self.inner.into()
+            self.inner.value()
         }
 
         fn __str__(&self) -> String {
@@ -36,7 +36,7 @@ impl_packable_py! {
         }
 
         fn __int___(&self) -> u64 {
-            self.inner.into()
+            self.inner.value()
         }
 
         fn __richcmp__(&self, other: PyRef<SymbolCode>, op: CompareOp) -> PyResult<bool> {

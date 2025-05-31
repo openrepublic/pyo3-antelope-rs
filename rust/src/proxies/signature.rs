@@ -1,9 +1,10 @@
-use antelope::chain::key_type::{KeyType, KeyTypeTrait};
+use antelope::chain::key_type::KeyType;
 use antelope::chain::signature::Signature as NativeSig;
 use antelope::serializer::{Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use std::str::FromStr;
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -16,14 +17,14 @@ impl Signature {
     #[staticmethod]
     fn from_str(s: &str) -> PyResult<Self> {
         Ok(Signature {
-            inner: NativeSig::from_string(s).map_err(|e| PyValueError::new_err(e))?,
+            inner: NativeSig::from_str(s).map_err(|e| PyValueError::new_err(e))?,
         })
     }
 
     #[staticmethod]
     fn from_bytes(raw: &[u8]) -> PyResult<Self> {
         let key_type =
-            KeyType::from_index(raw[0]).map_err(|e| PyValueError::new_err(e.to_string()))?;
+            KeyType::try_from(raw[0]).map_err(|e| PyValueError::new_err(e.to_string()))?;
 
         Ok(Signature {
             inner: NativeSig::from_bytes(raw.to_vec(), key_type), // .map_err(|e| PyValueError::new_err(e))?,

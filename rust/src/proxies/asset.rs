@@ -63,7 +63,7 @@ impl_packable_py! {
         }
 
         fn to_decimal(&self) -> Decimal {
-            let mut str_amount = format!("{:0>width$}", self.amount(), width = self.symbol().precision() + 1);
+            let mut str_amount = format!("{:0>width$}", self.amount(), width = (self.symbol().precision() + 1) as usize);
 
             if self.symbol().precision() > 0 {
                 let len = str_amount.len();

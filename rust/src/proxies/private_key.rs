@@ -1,11 +1,12 @@
 use crate::proxies::public_key::PublicKey;
-use antelope::chain::key_type::{KeyType, KeyTypeTrait};
+use antelope::chain::key_type::KeyType;
 use antelope::chain::private_key::PrivateKey as NativePrivateKey;
 use antelope::serializer::{Encoder, Packer};
 use pyo3::basic::CompareOp;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::str::FromStr;
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -18,7 +19,7 @@ impl PrivateKey {
     #[staticmethod]
     fn from_str(s: &str) -> PyResult<Self> {
         Ok(PrivateKey {
-            inner: NativePrivateKey::try_from(s)
+            inner: NativePrivateKey::from_str(s)
                 .map_err(|e| PyValueError::new_err(e.to_string()))?,
         })
     }
@@ -26,7 +27,7 @@ impl PrivateKey {
     #[staticmethod]
     fn from_bytes(raw: &[u8]) -> PyResult<Self> {
         let key_type =
-            KeyType::from_index(raw[0]).map_err(|e| PyValueError::new_err(e.to_string()))?;
+            KeyType::try_from(raw[0]).map_err(|e| PyValueError::new_err(e.to_string()))?;
 
         Ok(PrivateKey {
             inner: NativePrivateKey::from_bytes(raw[1..].to_vec(), key_type),
@@ -35,7 +36,7 @@ impl PrivateKey {
 
     #[staticmethod]
     pub fn random(key_type: u8) -> PyResult<Self> {
-        let key_type = KeyType::from_index(key_type)
+        let key_type = KeyType::try_from(key_type)
             .map_err(|e| PyValueError::new_err(format!("Invalid key type format {}", e)))?;
 
         let inner = NativePrivateKey::random(key_type)
@@ -48,15 +49,19 @@ impl PrivateKey {
         self.inner.value.as_slice()
     }
 
-    pub fn get_public(&self) -> PublicKey {
-        self.into()
+    pub fn get_public(&self) -> PyResult<PublicKey> {
+        Ok(PublicKey {
+            inner: self.inner.to_public()
+                .map_err(|e| PyValueError::new_err(e.to_string()))?
+        })
     }
 
-    pub fn sign_message(&self, msg: Vec<u8>) -> Vec<u8> {
+    pub fn sign_message(&self, msg: Vec<u8>) -> PyResult<Vec<u8>> {
         let mut encoder = Encoder::new(0);
-        let sig = self.inner.sign_message(&msg);
+        let sig = self.inner.sign_message(&msg)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         sig.pack(&mut encoder);
-        encoder.get_bytes().to_vec()
+        Ok(encoder.get_bytes().to_vec())
     }
 
     fn __str__(&self) -> String {

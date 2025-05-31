@@ -2,6 +2,7 @@ use antelope::chain::action::{Action, PermissionLevel};
 use antelope::chain::name::Name as NativeName;
 use pyo3::{FromPyObject, PyResult};
 use pyo3::exceptions::PyValueError;
+use std::str::FromStr;
 
 #[macro_export]
 macro_rules! impl_packable_py {
@@ -47,8 +48,8 @@ pub(crate) struct PyPermissionLevel {
 impl From<&PyPermissionLevel> for PyResult<PermissionLevel> {
     fn from(value: &PyPermissionLevel) -> Self {
         Ok(PermissionLevel::new(
-            NativeName::try_from(&value.actor).map_err(|e| PyValueError::new_err(e.to_string()))?,
-            NativeName::try_from(&value.permission).map_err(|e| PyValueError::new_err(e.to_string()))?,
+            NativeName::from_str(&value.actor).map_err(|e| PyValueError::new_err(e.to_string()))?,
+            NativeName::from_str(&value.permission).map_err(|e| PyValueError::new_err(e.to_string()))?,
         ))
     }
 }
@@ -69,8 +70,8 @@ impl From<&PyAction> for PyResult<Action> {
             auths.push(maybe_perm?);
         }
         Ok(Action {
-            account: NativeName::try_from(&py_action.account).map_err(|e| PyValueError::new_err(e.to_string()))?,
-            name: NativeName::try_from(&py_action.name).map_err(|e| PyValueError::new_err(e.to_string()))?,
+            account: NativeName::from_str(&py_action.account).map_err(|e| PyValueError::new_err(e.to_string()))?,
+            name: NativeName::from_str(&py_action.name).map_err(|e| PyValueError::new_err(e.to_string()))?,
             authorization: auths,
             data: py_action.data.clone(),
         })

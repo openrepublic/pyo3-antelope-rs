@@ -6,6 +6,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
+use std::str::FromStr;
 
 #[pyclass]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -24,24 +25,24 @@ impl_packable_py! {
         #[staticmethod]
         fn from_int(value: u64) -> PyResult<Self> {
             // If you'd like to mirror the original assertion, handle it as an error:
-            let name = NativeName::from(value);
+            let name = NativeName::try_from(value).map_err(|e| PyValueError::new_err(e.to_string()))?;
             Ok(Name { inner: name })
         }
 
         #[staticmethod]
         fn from_str(s: &str) -> PyResult<Self> {
             Ok(Name{
-                inner: NativeName::try_from(s)
+                inner: NativeName::from_str(s)
                     .map_err(|e| PyValueError::new_err(e.to_string()))?
             })
         }
 
         pub fn value(&self) -> u64 {
-            self.inner.into()
+            self.inner.value()
         }
 
         fn __str__(&self) -> PyResult<String> {
-            self.inner.as_string()
+            self.inner.as_str()
                 .map_err(|e| PyValueError::new_err(e.to_string()))
         }
 

@@ -9,6 +9,7 @@ use antelope::chain::transaction::{CompressionType, PackedTransaction, SignedTra
 use antelope::chain::varint::VarUint32;
 use antelope::chain::abi::BUILTIN_TYPES;
 use antelope::util::bytes_to_hex;
+use pyo3::exceptions::PyValueError;
 use pyo3::panic::PanicException;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFrozenSet};
@@ -65,7 +66,10 @@ fn sign_tx(
     let sign_data = transaction.signing_data(chain_id.as_slice());
     let signed_tx = SignedTransaction {
         transaction,
-        signatures: vec![sign_key.inner.sign_message(&sign_data)],
+        signatures: vec![
+            sign_key.inner.sign_message(&sign_data)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?
+        ],
         context_free_data: vec![]
     };
 

@@ -1,12 +1,12 @@
 use crate::impl_packable_py;
 use crate::proxies::private_key::PrivateKey;
-use antelope::chain::key_type::KeyTypeTrait;
-use antelope::chain::public_key::PublicKey as NativePublicKey;
+use antelope::chain::public_key::{PublicKey as NativePublicKey, PublicKeyParsingError};
 use antelope::serializer::Packer;
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::str::FromStr;
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -19,7 +19,7 @@ impl_packable_py! {
         #[staticmethod]
         fn from_str(s: &str) -> PyResult<Self> {
             Ok(PublicKey{
-                inner: NativePublicKey::try_from(s)
+                inner: NativePublicKey::from_str(s)
                     .map_err(|e| PyValueError::new_err(e.to_string()))?
             })
         }
@@ -51,10 +51,11 @@ impl_packable_py! {
     }
 }
 
-impl From<&PrivateKey> for PublicKey {
-    fn from(value: &PrivateKey) -> Self {
-        Self {
-            inner: value.inner.to_public(),
-        }
+impl TryFrom<&PrivateKey> for PublicKey {
+    type Error = PublicKeyParsingError;
+    fn try_from(value: &PrivateKey) -> Result<Self, Self::Error> {
+        Ok(Self {
+            inner: value.inner.to_public()?
+        })
     }
 }
