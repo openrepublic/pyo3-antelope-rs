@@ -13,10 +13,14 @@
 
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from .abi import ABIView as ABIView
+from .abi import (
+    ABILike as ABILike,
+    ABIView as ABIView
+)
 
 from .builtins import (
     builtin_classes as builtin_classes,
+    builtin_class_map as builtin_class_map,
 
     NameLike as NameLike,
     Sum160Like as Sum160Like,
@@ -29,6 +33,8 @@ from .builtins import (
     SymLike as SymLike,
     AssetLike as AssetLike,
     ExtAssetLike as ExtAssetLike,
+
+    IOTypes as IOTypes
 )
 
 from ._lowlevel import (
@@ -51,4 +57,6 @@ from ._lowlevel import (
     ShipABI as ShipABI,
 
     builtin_types as builtin_types,
+
+    sign_tx as sign_tx
 )

@@ -6,33 +6,50 @@ use antelope::chain::asset::{
 };
 use antelope::serializer::Packer;
 use pyo3::basic::CompareOp;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use rust_decimal::Decimal;
 use std::fmt::Display;
 use std::str::FromStr;
+
+use super::name::NameLike;
+use super::sym::SymLike;
+
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct Asset {
     pub inner: NativeAsset,
 }
 
+#[derive(FromPyObject)]
+pub enum AssetLike<'py> {
+    Str(String),
+    Ints(i64, u8, String),
+    Decimal(Decimal, u8, String),
+    Dict(Bound<'py, PyDict>),
+    Cls(Asset)
+}
+
 impl_packable_py! {
     impl Asset(NativeAsset) {
         #[new]
-        fn new(amount: i64, sym_val: Py<PyAny>) -> PyResult<Self> {
-            let sym = Python::with_gil(|py| {
-                if let Ok(sym_str) = sym_val.extract::<String>(py) {
-                    return Ok(NativeSymbol::from_str(&sym_str)
-                        .map_err(|e| PyErr::new::<PyValueError, _>(e.to_string()))?);
-                } else if let Ok(sym) = sym_val.extract::<Symbol>(py) {
-                    return Ok(sym.inner);
-                }
-                Err(PyValueError::new_err("Could not convert provided to symbol"))
-            })?;
-            let inner = NativeAsset::try_from((amount, sym))
+        fn new<'py>(amount: i64, sym: SymLike) -> PyResult<Self> {
+            let sym = Symbol::try_from(sym)?;
+            let inner = NativeAsset::try_from((amount, sym.inner))
                 .map_err(|e| PyValueError::new_err(e.to_string()))?;
             Ok(Asset { inner })
+        }
+
+        #[staticmethod]
+        pub fn try_from<'py>(value: AssetLike<'py>) -> PyResult<Asset> {
+            match value {
+                AssetLike::Str(s) => Asset::from_str(&s),
+                AssetLike::Ints(amount, precision, sym) => Asset::from_ints(amount, precision, &sym),
+                AssetLike::Decimal(d, precision, sym) => Asset::from_decimal(d, precision, &sym),
+                AssetLike::Dict(d) => Asset::from_dict(d),
+                AssetLike::Cls(asset) => Ok(asset)
+            }
         }
 
         #[staticmethod]
@@ -60,6 +77,19 @@ impl_packable_py! {
 
             let num_str = d_str[..dot_idx + 1 + precision as usize].to_string();
             Ok(Asset::from_str(&format!("{} {}", num_str, sym))?)
+        }
+
+        #[staticmethod]
+        fn from_dict<'py>(d: Bound<'py, PyDict>) -> PyResult<Self> {
+            let py_amount = d.get_item("amount")?
+                .ok_or(PyKeyError::new_err("Expected asset dict to have amount key"))?
+                .extract()?;
+
+            let py_symbol = d.get_item("symbol")?
+                .ok_or(PyKeyError::new_err("Expected asset dict to have amount key"))?
+                .extract()?;
+
+            Asset::new(py_amount, py_symbol)
         }
 
         fn to_decimal(&self) -> Decimal {
@@ -139,8 +169,25 @@ impl From<&ExtendedAsset> for NativeExtAsset {
 #[pymethods]
 impl ExtendedAsset {
     #[staticmethod]
+    fn from_dict<'py>(d: Bound<'py, PyDict>) -> PyResult<Self> {
+        let quantity = Asset::try_from(
+            d.get_item("quantity")?
+                .ok_or(PyKeyError::new_err("Expected asset dict to have amount key"))?
+                .extract::<AssetLike>()?
+        )?;
+
+        let contract = Name::try_from(
+            d.get_item("contract")?
+                .ok_or(PyKeyError::new_err("Expected asset dict to have amount key"))?
+                .extract::<NameLike>()?
+        )?;
+
+        Ok(ExtendedAsset{ quantity, contract })
+    }
+
+    #[staticmethod]
     fn from_str(s: &str) -> PyResult<Self> {
-        let ext = NativeExtAsset::try_from(s).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let ext = NativeExtAsset::from_str(s).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(ExtendedAsset {
             quantity: Asset {
                 inner: ext.quantity,

@@ -20,6 +20,13 @@ impl Hash for Name {
     }
 }
 
+#[derive(FromPyObject)]
+pub enum NameLike {
+    Num(u64),
+    Str(String),
+    Cls(Name)
+}
+
 impl_packable_py! {
     impl Name(NativeName) {
         #[staticmethod]
@@ -35,6 +42,15 @@ impl_packable_py! {
                 inner: NativeName::from_str(s)
                     .map_err(|e| PyValueError::new_err(e.to_string()))?
             })
+        }
+
+        #[staticmethod]
+        pub fn try_from(value: NameLike) -> PyResult<Name> {
+            match value {
+                NameLike::Num(n) => Name::from_int(n),
+                NameLike::Str(n_str) => Name::from_str(&n_str),
+                NameLike::Cls(n) => Ok(n.clone())
+            }
         }
 
         pub fn value(&self) -> u64 {

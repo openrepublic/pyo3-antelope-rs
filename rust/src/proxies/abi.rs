@@ -1,7 +1,5 @@
 use antelope::chain::abi::{
-    ABITypeResolver,
-    ShipABI as NativeShipABI,
-    ABI as NativeABI, AbiTableView
+    ABITypeResolver, AbiStruct, AbiTableView, AbiVariant, ShipABI as NativeShipABI, ABI as NativeABI
 };
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
@@ -10,6 +8,32 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use serde::ser::Serialize;
 use serde_json::Serializer;
+use crate::serializer::{
+    encode::encode_abi_type,
+    decode::decode_abi_type
+};
+
+fn abi_struct_as_dict<'py>(py: Python<'py>, s: &AbiStruct) -> PyResult<Bound<'py, PyDict>> {
+    let d = PyDict::new(py);
+    d.set_item("name", s.name.clone())?;
+    d.set_item("base", s.base.clone())?;
+    let mut fields = Vec::with_capacity(s.fields.len());
+    for fmeta in s.fields.iter() {
+        let f = PyDict::new(py);
+        f.set_item("name", fmeta.name.clone())?;
+        f.set_item("type", fmeta.r#type.clone())?;
+        fields.push(f);
+    }
+    d.set_item("fields", fields)?;
+    Ok(d)
+}
+
+fn abi_variant_as_dict<'py>(py: Python<'py>, v: &AbiVariant) -> PyResult<Bound<'py, PyDict>> {
+    let d = PyDict::new(py);
+    d.set_item("name", v.name.clone())?;
+    d.set_item("types", v.types.clone())?;
+    Ok(d)
+}
 
 macro_rules! define_pyabi {
     ($wrapper:ident, $inner:path) => {
@@ -59,18 +83,7 @@ macro_rules! define_pyabi {
             pub fn _structs<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
                 let mut ret = Vec::new();
                 for s in self.inner.structs.iter() {
-                    let d = PyDict::new(py);
-                    d.set_item("name", s.name.clone())?;
-                    d.set_item("base", s.base.clone())?;
-                    let mut fields = Vec::with_capacity(s.fields.len());
-                    for fmeta in s.fields.iter() {
-                        let f = PyDict::new(py);
-                        f.set_item("name", fmeta.name.clone())?;
-                        f.set_item("type", fmeta.r#type.clone())?;
-                        fields.push(f);
-                    }
-                    d.set_item("fields", fields)?;
-                    ret.push(d);
+                    ret.push(abi_struct_as_dict(py, s)?);
                 }
                 Ok(ret)
             }
@@ -79,10 +92,7 @@ macro_rules! define_pyabi {
             pub fn _variants<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
                 let mut ret = Vec::new();
                 for v in self.inner.variants.iter() {
-                    let d = PyDict::new(py);
-                    d.set_item("name", v.name.clone())?;
-                    d.set_item("types", v.types.clone())?;
-                    ret.push(d);
+                    ret.push(abi_variant_as_dict(py, v)?);
                 }
                 Ok(ret)
             }
@@ -115,22 +125,51 @@ macro_rules! define_pyabi {
                 Ok(ret)
             }
 
-            fn resolve_type<'py>(&self, py: Python<'py>, t: &str) -> PyResult<Bound<'py, PyDict>> {
-                let res = self.inner.resolve_type(t).map_err(|e| PyTypeError::new_err(e.to_string()))?;
+            pub fn resolve_type_into_dict<'py>(
+                &self,
+                py: Python<'py>,
+                t: &str,
+            ) -> PyResult<Bound<'py, PyDict>> {
+                let res = self
+                    .inner
+                    .resolve_type(t)
+                    .map_err(|e| PyTypeError::new_err(e.to_string()))?;
+
                 let dict = PyDict::new(py);
 
-                dict.set_item("original_name".to_string(), res.original_name)?;
-                dict.set_item("resolved_name".to_string(), res.resolved_name)?;
-                dict.set_item("is_std".to_string(), res.is_std)?;
-                dict.set_item("is_alias".to_string(), res.is_alias)?;
-                dict.set_item("is_variant".to_string(), res.is_variant)?;
-                dict.set_item("is_struct".to_string(), res.is_struct)?;
+                let is_struct = res
+                    .is_struct
+                    .map(|def| abi_struct_as_dict(py, &def))
+                    .transpose()?;
+
+                let is_variant = res
+                    .is_variant
+                    .map(|def| abi_variant_as_dict(py, &def))
+                    .transpose()?;
+
+                dict.set_item("original_name", res.original_name)?;
+                dict.set_item("resolved_name", res.resolved_name)?;
+                dict.set_item("is_std", res.is_std)?;
+                dict.set_item("is_alias", res.is_alias)?;
+                dict.set_item("is_variant", is_variant)?;
+                dict.set_item("is_struct", is_struct)?;
                 dict.set_item(
                     "modifiers".to_string(),
                     PyList::new(py, res.modifiers.iter().map(|tm| tm.as_str()))?
                 )?;
 
                 Ok(dict)
+            }
+
+            pub fn pack<'py>(&self, t: &str, val: &Bound<'py, PyAny>) -> PyResult<Vec<u8>> {
+                let mut encoder = Encoder::new(0);
+                encode_abi_type(&self.inner, t, val, &mut encoder)?;
+                Ok(encoder.get_bytes().to_vec())
+            }
+
+            pub fn unpack<'py>(&self, py: Python<'py>, t: &str, buf: &[u8]) -> PyResult<Bound<'py, PyAny>> {
+                let mut decoder = Decoder::new(buf);
+                decode_abi_type(py, &self.inner, t, &mut decoder)
             }
 
             pub fn to_string(&self) -> String {
@@ -166,3 +205,4 @@ macro_rules! define_pyabi {
 
 define_pyabi!(ABI, NativeABI);
 define_pyabi!(ShipABI, NativeShipABI);
+

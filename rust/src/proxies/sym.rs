@@ -13,8 +13,25 @@ pub struct Symbol {
     pub inner: NativeSymbol,
 }
 
+#[derive(FromPyObject)]
+pub enum SymLike {
+    Str(String),
+    Int(u64),
+    Cls(Symbol)
+}
+
+
 impl_packable_py! {
     impl Symbol(NativeSymbol) {
+        #[staticmethod]
+        pub fn try_from(value: SymLike) -> PyResult<Symbol> {
+            match value {
+                SymLike::Str(s) => Symbol::from_str(&s),
+                SymLike::Int(sym) => Symbol::from_int(sym),
+                SymLike::Cls(sym) => Ok(sym)
+            }
+        }
+
         #[staticmethod]
         pub fn from_str(s: &str) -> PyResult<Self> {
             Ok(Symbol { inner: NativeSymbol::from_str(s)
@@ -23,7 +40,8 @@ impl_packable_py! {
 
         #[staticmethod]
         pub fn from_int(sym: u64) -> PyResult<Self> {
-            Ok(Symbol { inner: sym.into()})
+            Ok(Symbol { inner: NativeSymbol::try_from(sym)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?})
         }
 
         #[getter]

@@ -1,6 +1,7 @@
+pub mod serializer;
 pub mod proxies;
-
 pub mod types;
+
 mod utils;
 
 use antelope::chain::action::Action;
@@ -12,7 +13,7 @@ use antelope::util::bytes_to_hex;
 use pyo3::exceptions::PyValueError;
 use pyo3::panic::PanicException;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyFrozenSet};
+use pyo3::types::{PyDict, PyFrozenSet, PyInt};
 use crate::proxies::{
     name::Name,
     sym_code::SymbolCode,
@@ -96,12 +97,22 @@ fn sign_tx(
 #[pymodule(name="_lowlevel")]
 fn antelope_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     pyo3_log::init();
+
     let py_builtin_types = PyFrozenSet::new(
         py,
         BUILTIN_TYPES.iter()
     )?;
-
     m.add("builtin_types", py_builtin_types)?;
+
+    let py_asset_max_amount = PyInt::new(
+        py, antelope::chain::asset::ASSET_MAX_AMOUNT
+    );
+    m.add("asset_max_amount", py_asset_max_amount)?;
+
+    let py_asset_max_precision = PyInt::new(
+        py, antelope::chain::asset::ASSET_MAX_PRECISION
+    );
+    m.add("asset_max_precision", py_asset_max_precision)?;
 
     // pack/unpack
     m.add_function(wrap_pyfunction!(sign_tx, m)?)?;

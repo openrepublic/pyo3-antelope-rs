@@ -19,6 +19,7 @@ import hashlib
 
 from typing import (
     Annotated,
+    Callable,
     Literal,
     Type
 )
@@ -88,6 +89,35 @@ BaseTypeNameStr = Annotated[
     )
 ]
 
+# hex strings
+regex_hex_str = r'^[A-Za-z0-9_]*$'
+Sum160Str = Annotated[
+    str,
+    Meta(
+        pattern=regex_hex_str,
+        min_length=40,
+        max_length=40
+    )
+]
+
+Sum256Str = Annotated[
+    str,
+    Meta(
+        pattern=regex_hex_str,
+        min_length=64,
+        max_length=64
+    )
+]
+
+Sum512Str = Annotated[
+    str,
+    Meta(
+        pattern=regex_hex_str,
+        min_length=128,
+        max_length=128
+    )
+]
+
 
 TypeModifier = Literal['optional'] | Literal['extension'] | Literal['array']
 TypeSuffix = Literal['?'] | Literal['$'] | Literal['[]']
@@ -144,8 +174,8 @@ class ABIResolvedType(Struct, frozen=True):
     resolved_name: TypeNameStr
     is_std: bool
     is_alias: bool
-    is_struct: bool
-    is_variant: bool
+    is_struct: StructDef | None
+    is_variant: VariantDef | None
     modifiers: list[TypeModifier]
 
 
@@ -220,7 +250,7 @@ def _hash(self, *, as_bytes: bool = False) -> str | bytes:
     )
 
 def _resolve_type(self, type_name: str) -> ABIResolvedType:
-    return convert(self.resolve_type(type_name), type=ABIResolvedType)
+    return convert(self.resolve_type_into_dict(type_name), type=ABIResolvedType)
 
 # finally monkey patch ABI & ShipABI
 
@@ -242,7 +272,7 @@ _properties = [
 
 _methods = [
     ('hash', _hash),
-    ('_resolve_type', _resolve_type),
+    ('resolve_type', _resolve_type),
 ]
 
 for name, fn in _class_methods:
@@ -253,6 +283,9 @@ for name, fn in _properties:
 
 for name, fn in _methods:
     _apply_to_abi_classes(name, fn)
+
+
+ABILike = bytes | str | dict | ABI | ShipABI
 
 
 # ABIView:
@@ -290,6 +323,12 @@ class ABIView:
     variant_map: frozendict[TypeNameStr, VariantDef]
     struct_map: frozendict[TypeNameStr, StructDef]
     valid_types: frozenset[TypeNameStr]
+
+    # only available if antelope_rs.testing is imported
+    make_canonical: Callable
+    canonical_diff: Callable
+    assert_deep_eq: Callable
+    random_of: Callable
 
     def __init__(
         self,
@@ -361,7 +400,10 @@ class ABIView:
         return self._def.hash(as_bytes=as_bytes)
 
     def resolve_type(self, type_name: str) -> ABIResolvedType:
-        return convert(
-            self._def._resolve_type(type_name),
-            type=ABIResolvedType
-        )
+        return self._def.resolve_type(type_name)
+
+    def pack(self, *args, **kwargs) -> bytes:
+        return self._def.pack(*args, **kwargs)
+
+    def unpack(self, *args, **kwargs) -> bytes:
+        return self._def.unpack(*args, **kwargs)

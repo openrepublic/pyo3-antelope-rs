@@ -39,17 +39,27 @@ from antelope_rs._lowlevel import (
     Asset,
     ExtendedAsset,
 )
+from antelope_rs.abi import (
+    AntelopeNameStr,
+    Sum160Str,
+    Sum256Str,
+    Sum512Str
+)
 
 
 # monkey patch try_from into builtin classes
+
 _converters: list[tuple[Type, str]] = [
     (str,   'from_str'),
     (int,   'from_int'),
+    (dict,  'from_dict'),
     (bytes, 'from_bytes'),
 ]
 
-
 def _maybe_patch_converters_for(cls: Type[Any]):
+    if hasattr(cls, 'try_from'):
+        return
+
     # figure out which converters does the class have
     converters = []
     for py_type, ctor_name in _converters:
@@ -78,8 +88,7 @@ def _patch_wrappers_converters(classes: Iterable[Type[Any]]) -> None:
         _maybe_patch_converters_for(cls)
 
 
-
-_types_conv: list[Type[Any]] = [
+builtin_classes: tuple[Type[Any], ...] = (
     Name,
     Checksum160,
     Checksum256,
@@ -91,23 +100,18 @@ _types_conv: list[Type[Any]] = [
     ExtendedAsset,
     SymbolCode,
     Symbol,
-]
-
-_patch_wrappers_converters(_types_conv)
-
-
-builtin_classes: list[Type[Any]] = [
-    *_types_conv,
     ABI,
     ShipABI
-]
+)
+
+_patch_wrappers_converters(builtin_classes)
 
 
 # typing hints for each builtin class supporting try_from
-NameLike = int | str | Name
-Sum160Like = bytes | str | Checksum160
-Sum256Like = bytes | str | Checksum256
-Sum512Like = bytes | str | Checksum512
+NameLike = int | AntelopeNameStr | Name
+Sum160Like = bytes | Sum160Str | Checksum160
+Sum256Like = bytes | Sum256Str | Checksum256
+Sum512Like = bytes | Sum512Str | Checksum512
 PrivKeyLike = bytes | str | PrivateKey
 PubKeyLike = bytes | str | PublicKey
 SigLike = bytes | str | Signature
@@ -115,3 +119,22 @@ SymCodeLike = int | str | SymbolCode
 SymLike = int | str | Symbol
 AssetLike = str | Asset
 ExtAssetLike = str | ExtendedAsset
+
+IOTypes = (
+    None | bool | int | float | bytes | str | list | dict
+)
+
+
+# map std names to builtin_classes
+builtin_class_map: dict[str, Type[Any]] = {
+    'name': Name,
+    'checksum160': Checksum160,
+    'checksum256': Checksum256,
+    'checksum512': Checksum512,
+    'public_key': PublicKey,
+    'signature': Signature,
+    'symbol': Symbol,
+    'symbol_code': SymbolCode,
+    'asset': Asset,
+    'extended_asset': ExtendedAsset,
+}
