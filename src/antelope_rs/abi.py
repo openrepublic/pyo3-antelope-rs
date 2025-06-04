@@ -43,7 +43,15 @@ from ._lowlevel import (
 
 # msgspec compatible type hints for different string fields in ABI definitions
 
-# raw uint64
+# raw ints
+Int32Bytes = Annotated[
+    bytes,
+    Meta(
+        min_length=4,
+        max_length=4
+    )
+]
+
 Int64Bytes = Annotated[
     bytes,
     Meta(

@@ -19,6 +19,7 @@ from typing import (
 )
 
 from .abi import (
+    Int32Bytes,
     Int64Bytes as Int64Bytes,
     AntelopeNameStr as AntelopeNameStr,
     AssetBytes as AssetBytes,
@@ -52,6 +53,10 @@ from ._lowlevel import (
     Asset as Asset,
     ExtendedAsset as ExtendedAsset,
 
+    TimePoint as TimePoint,
+    TimePointSec as TimePointSec,
+    BlockTimestamp as BlockTimestamp,
+
     ABI as ABI,
     ShipABI as ShipABI,
 
@@ -72,6 +77,9 @@ builtin_classes: tuple[Type[Any], ...] = (
     ExtendedAsset,
     SymbolCode,
     Symbol,
+    TimePoint,
+    TimePointSec,
+    BlockTimestamp,
     ABI,
     ShipABI
 )
@@ -88,6 +96,9 @@ SymCodeLike = SymCodeBytes | int | str | SymbolCode
 SymLike = SymbolBytes | int | str | Symbol
 AssetLike = AssetBytes | str | Asset
 ExtAssetLike = ExtAssetBytes | str | ExtendedAsset
+TimePointLike = Int64Bytes | int | str | TimePoint
+TimePointSecLike = Int64Bytes | int | str | TimePointSec
+BlockTimestampLike = Int32Bytes | int | str | BlockTimestamp
 
 IOTypes = (
     None | bool | int | float | bytes | str | list | dict
@@ -106,4 +117,7 @@ builtin_class_map: dict[str, Type[Any]] = {
     'symbol_code': SymbolCode,
     'asset': Asset,
     'extended_asset': ExtendedAsset,
+    'time_point': TimePoint,
+    'time_point_sec': TimePointSec,
+    'block_timestamp_type': BlockTimestamp,
 }

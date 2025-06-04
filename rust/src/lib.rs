@@ -10,6 +10,7 @@ use crate::proxies::signature::PySignature;
 use crate::proxies::{asset::{PyAsset, PyExtendedAsset}, name::PyName, sym::PySymbol, sym_code::PySymbolCode};
 use crate::sign::sign_tx;
 use antelope::chain::abi::BUILTIN_TYPES;
+use proxies::time::{PyBlockTimestamp, PyTimePoint, PyTimePointSec};
 use pyo3::panic::PanicException;
 use pyo3::prelude::*;
 use pyo3::types::{PyFrozenSet, PyInt};
@@ -45,6 +46,10 @@ fn antelope_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySymbol>()?;
     m.add_class::<PyAsset>()?;
     m.add_class::<PyExtendedAsset>()?;
+
+    m.add_class::<PyTimePoint>()?;
+    m.add_class::<PyTimePointSec>()?;
+    m.add_class::<PyBlockTimestamp>()?;
 
     m.add_class::<PyABI>()?;
     m.add_class::<PyShipABI>()?;
