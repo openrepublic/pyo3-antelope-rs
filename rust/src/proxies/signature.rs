@@ -15,7 +15,7 @@ pub struct Signature {
 pub enum SigLike {
     Raw(Vec<u8>),
     Str(String),
-    Cls(Signature)
+    Cls(Signature),
 }
 
 impl From<Signature> for NativeSig {
@@ -33,12 +33,11 @@ impl From<NativeSig> for Signature {
 #[pymethods]
 impl Signature {
     #[staticmethod]
-    pub fn from_bytes(
-        buffer: &[u8]
-    ) -> PyResult<Self> {
+    pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
         let mut decoder = Decoder::new(buffer);
         let mut inner: NativeSig = Default::default();
-        decoder.unpack(&mut inner)
+        decoder
+            .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(inner.into())
     }
@@ -56,7 +55,7 @@ impl Signature {
         match value {
             SigLike::Raw(data) => Signature::from_bytes(&data),
             SigLike::Str(s) => Signature::from_str_py(&s),
-            SigLike::Cls(key) => Ok(key)
+            SigLike::Cls(key) => Ok(key),
         }
     }
 

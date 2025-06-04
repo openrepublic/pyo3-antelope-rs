@@ -1,6 +1,4 @@
-use antelope::chain::asset::{
-    Asset as NativeAsset, ExtendedAsset as NativeExtAsset,
-};
+use antelope::chain::asset::{Asset as NativeAsset, ExtendedAsset as NativeExtAsset};
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyKeyError, PyValueError};
@@ -10,10 +8,10 @@ use rust_decimal::Decimal;
 use std::fmt::Display;
 use std::str::FromStr;
 
-use crate::proxies::name::Name;
-use crate::proxies::sym::Symbol;
-use crate::proxies::name::NameLike;
-use crate::proxies::sym::SymLike;
+use crate::proxies::{
+    name::{Name, NameLike},
+    sym::{SymLike, Symbol},
+};
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -28,7 +26,7 @@ pub enum AssetLike<'py> {
     Int(i64, SymLike),
     Decimal(Decimal, SymLike),
     Dict(Bound<'py, PyDict>),
-    Cls(Asset)
+    Cls(Asset),
 }
 
 impl From<Asset> for NativeAsset {
@@ -54,12 +52,11 @@ impl Asset {
     }
 
     #[staticmethod]
-    pub fn from_bytes(
-        buffer: &[u8]
-    ) -> PyResult<Self> {
+    pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
         let mut decoder = Decoder::new(buffer);
         let mut inner: NativeAsset = Default::default();
-        decoder.unpack(&mut inner)
+        decoder
+            .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(inner.into())
     }
@@ -84,12 +81,18 @@ impl Asset {
 
     #[staticmethod]
     pub fn from_dict<'py>(d: Bound<'py, PyDict>) -> PyResult<Self> {
-        let py_amount = d.get_item("amount")?
-            .ok_or(PyKeyError::new_err("Expected asset dict to have amount key"))?
+        let py_amount = d
+            .get_item("amount")?
+            .ok_or(PyKeyError::new_err(
+                "Expected asset dict to have amount key",
+            ))?
             .extract()?;
 
-        let py_symbol = d.get_item("symbol")?
-            .ok_or(PyKeyError::new_err("Expected asset dict to have amount key"))?
+        let py_symbol = d
+            .get_item("symbol")?
+            .ok_or(PyKeyError::new_err(
+                "Expected asset dict to have amount key",
+            ))?
             .extract()?;
 
         Asset::new(py_amount, py_symbol)
@@ -103,12 +106,16 @@ impl Asset {
             AssetLike::Int(amount, sym) => Asset::new(amount, sym),
             AssetLike::Decimal(d, sym) => Asset::from_decimal(d, sym),
             AssetLike::Dict(d) => Asset::from_dict(d),
-            AssetLike::Cls(asset) => Ok(asset)
+            AssetLike::Cls(asset) => Ok(asset),
         }
     }
 
     fn to_decimal(&self) -> Decimal {
-        let mut str_amount = format!("{:0>width$}", self.amount(), width = (self.symbol().precision() + 1) as usize);
+        let mut str_amount = format!(
+            "{:0>width$}",
+            self.amount(),
+            width = (self.symbol().precision() + 1) as usize
+        );
 
         if self.symbol().precision() > 0 {
             let len = str_amount.len();
@@ -151,13 +158,17 @@ impl Asset {
     }
 
     fn __add__(&self, other: &Asset) -> PyResult<Asset> {
-        let result = self.inner.try_add(other.inner)
+        let result = self
+            .inner
+            .try_add(other.inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(Asset { inner: result })
     }
 
     fn __sub__(&self, other: &Asset) -> PyResult<Asset> {
-        let result = self.inner.try_sub(other.inner)
+        let result = self
+            .inner
+            .try_sub(other.inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(Asset { inner: result })
     }
@@ -172,7 +183,7 @@ impl Display for Asset {
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct ExtendedAsset {
-    pub inner: NativeExtAsset
+    pub inner: NativeExtAsset,
 }
 
 #[derive(FromPyObject)]
@@ -180,7 +191,7 @@ pub enum ExtAssetLike<'py> {
     Raw([u8; 24]),
     Str(String),
     Dict(Bound<'py, PyDict>),
-    Cls(ExtendedAsset)
+    Cls(ExtendedAsset),
 }
 
 impl From<ExtendedAsset> for NativeExtAsset {
@@ -201,12 +212,11 @@ impl From<NativeExtAsset> for ExtendedAsset {
 #[pymethods]
 impl ExtendedAsset {
     #[staticmethod]
-    pub fn from_bytes(
-        buffer: &[u8]
-    ) -> ::pyo3::PyResult<Self> {
+    pub fn from_bytes(buffer: &[u8]) -> ::pyo3::PyResult<Self> {
         let mut decoder = Decoder::new(buffer);
         let mut inner: NativeExtAsset = Default::default();
-        decoder.unpack(&mut inner)
+        decoder
+            .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(inner.into())
     }
@@ -214,8 +224,7 @@ impl ExtendedAsset {
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        let ext = NativeExtAsset::from_str(s)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let ext = NativeExtAsset::from_str(s).map_err(|e| PyValueError::new_err(e.to_string()))?;
 
         Ok(ext.into())
     }
@@ -224,19 +233,25 @@ impl ExtendedAsset {
     pub fn from_dict<'py>(d: Bound<'py, PyDict>) -> PyResult<Self> {
         let quantity = Asset::try_from(
             d.get_item("quantity")?
-                .ok_or(PyKeyError::new_err("Expected asset dict to have amount key"))?
-                .extract::<AssetLike>()?
+                .ok_or(PyKeyError::new_err(
+                    "Expected asset dict to have amount key",
+                ))?
+                .extract::<AssetLike>()?,
         )?;
 
         let contract = Name::try_from(
             d.get_item("contract")?
-                .ok_or(PyKeyError::new_err("Expected asset dict to have amount key"))?
-                .extract::<NameLike>()?
+                .ok_or(PyKeyError::new_err(
+                    "Expected asset dict to have amount key",
+                ))?
+                .extract::<NameLike>()?,
         )?;
 
-        Ok(NativeExtAsset{
-            quantity: quantity.inner, contract: contract.inner
-        }.into())
+        Ok(NativeExtAsset {
+            quantity: quantity.inner,
+            contract: contract.inner,
+        }
+        .into())
     }
 
     #[staticmethod]
@@ -245,7 +260,7 @@ impl ExtendedAsset {
             ExtAssetLike::Raw(raw) => ExtendedAsset::from_bytes(&raw),
             ExtAssetLike::Str(s) => ExtendedAsset::from_str_py(&s),
             ExtAssetLike::Dict(d) => ExtendedAsset::from_dict(d),
-            ExtAssetLike::Cls(ext_asset) => Ok(ext_asset)
+            ExtAssetLike::Cls(ext_asset) => Ok(ext_asset),
         }
     }
 
@@ -269,7 +284,8 @@ impl ExtendedAsset {
         Ok(NativeExtAsset {
             quantity: result,
             contract: other.inner.contract,
-        }.into())
+        }
+        .into())
     }
 
     fn __sub__(&self, other: &ExtendedAsset) -> PyResult<ExtendedAsset> {
@@ -282,7 +298,8 @@ impl ExtendedAsset {
         Ok(NativeExtAsset {
             quantity: result,
             contract: other.inner.contract,
-        }.into())
+        }
+        .into())
     }
 }
 

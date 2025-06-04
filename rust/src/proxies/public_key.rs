@@ -17,7 +17,7 @@ pub struct PublicKey {
 pub enum PubKeyLike {
     Raw(Vec<u8>),
     Str(String),
-    Cls(PublicKey)
+    Cls(PublicKey),
 }
 
 impl From<PublicKey> for NativePublicKey {
@@ -35,12 +35,11 @@ impl From<NativePublicKey> for PublicKey {
 #[pymethods]
 impl PublicKey {
     #[staticmethod]
-    pub fn from_bytes(
-        buffer: &[u8]
-    ) -> PyResult<Self> {
+    pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
         let mut decoder = Decoder::new(buffer);
         let mut inner: NativePublicKey = Default::default();
-        decoder.unpack(&mut inner)
+        decoder
+            .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(inner.into())
     }
@@ -55,11 +54,11 @@ impl PublicKey {
 
     #[staticmethod]
     pub fn from_priv(p: &PrivateKey) -> PyResult<Self> {
-        p.inner.to_public()
-            .map(|k| k.into())
-            .map_err(|e| PyValueError::new_err(
-                format!("Error while extracting public key from private: {e}"))
-            )
+        p.inner.to_public().map(|k| k.into()).map_err(|e| {
+            PyValueError::new_err(format!(
+                "Error while extracting public key from private: {e}"
+            ))
+        })
     }
 
     #[staticmethod]
@@ -67,7 +66,7 @@ impl PublicKey {
         match value {
             PubKeyLike::Raw(data) => PublicKey::from_bytes(&data),
             PubKeyLike::Str(s) => PublicKey::from_str_py(&s),
-            PubKeyLike::Cls(key) => Ok(key)
+            PubKeyLike::Cls(key) => Ok(key),
         }
     }
 

@@ -18,7 +18,7 @@ pub enum SymCodeLike {
     Raw([u8; 8]),
     Str(String),
     Int(u64),
-    Cls(SymbolCode)
+    Cls(SymbolCode),
 }
 
 impl From<SymbolCode> for NativeSymbolCode {
@@ -36,12 +36,11 @@ impl From<NativeSymbolCode> for SymbolCode {
 #[pymethods]
 impl SymbolCode {
     #[staticmethod]
-    pub fn from_bytes(
-        buffer: &[u8]
-    ) -> PyResult<Self> {
+    pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
         let mut decoder = Decoder::new(buffer);
         let mut inner: NativeSymbolCode = Default::default();
-        decoder.unpack(&mut inner)
+        decoder
+            .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(inner.into())
     }
@@ -49,14 +48,18 @@ impl SymbolCode {
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(sym: &str) -> PyResult<Self> {
-        Ok(SymbolCode { inner: NativeSymbolCode::from_str(sym)
-            .map_err(|e| PyValueError::new_err(e.to_string()))? })
+        Ok(SymbolCode {
+            inner: NativeSymbolCode::from_str(sym)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+        })
     }
 
     #[staticmethod]
     pub fn from_int(sym: u64) -> PyResult<Self> {
-        Ok(SymbolCode { inner: NativeSymbolCode::try_from(sym)
-            .map_err(|e| PyValueError::new_err(e.to_string()))? })
+        Ok(SymbolCode {
+            inner: NativeSymbolCode::try_from(sym)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+        })
     }
 
     #[staticmethod]
@@ -65,7 +68,7 @@ impl SymbolCode {
             SymCodeLike::Raw(raw) => SymbolCode::from_bytes(&raw),
             SymCodeLike::Str(s) => SymbolCode::from_str_py(&s),
             SymCodeLike::Int(sym) => SymbolCode::from_int(sym),
-            SymCodeLike::Cls(sym) => Ok(sym)
+            SymCodeLike::Cls(sym) => Ok(sym),
         }
     }
 

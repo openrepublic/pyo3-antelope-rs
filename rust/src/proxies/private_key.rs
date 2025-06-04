@@ -18,7 +18,7 @@ pub struct PrivateKey {
 pub enum PrivKeyLike {
     Raw(Vec<u8>),
     Str(String),
-    Cls(PrivateKey)
+    Cls(PrivateKey),
 }
 
 impl From<PrivateKey> for NativePrivateKey {
@@ -56,7 +56,7 @@ impl PrivateKey {
         match value {
             PrivKeyLike::Raw(data) => PrivateKey::from_bytes(&data),
             PrivKeyLike::Str(s) => PrivateKey::from_str_py(&s),
-            PrivKeyLike::Cls(key) => Ok(key)
+            PrivKeyLike::Cls(key) => Ok(key),
         }
     }
 
@@ -77,14 +77,18 @@ impl PrivateKey {
 
     pub fn get_public(&self) -> PyResult<PublicKey> {
         Ok(PublicKey {
-            inner: self.inner.to_public()
-                .map_err(|e| PyValueError::new_err(e.to_string()))?
+            inner: self
+                .inner
+                .to_public()
+                .map_err(|e| PyValueError::new_err(e.to_string()))?,
         })
     }
 
     pub fn sign_message(&self, msg: Vec<u8>) -> PyResult<Vec<u8>> {
         let mut encoder = Encoder::new(0);
-        let sig = self.inner.sign_message(&msg)
+        let sig = self
+            .inner
+            .sign_message(&msg)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         sig.pack(&mut encoder);
         Ok(encoder.get_bytes().to_vec())

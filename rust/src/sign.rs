@@ -1,13 +1,15 @@
-use antelope::chain::transaction::{CompressionType, PackedTransaction, SignedTransaction, Transaction};
-use antelope::util::bytes_to_hex;
 use antelope::chain::action::{Action, PermissionLevel};
 use antelope::chain::name::Name as NativeName;
 use antelope::chain::time::TimePointSec;
 use antelope::chain::transaction::TransactionHeader;
+use antelope::chain::transaction::{
+    CompressionType, PackedTransaction, SignedTransaction, Transaction,
+};
 use antelope::chain::varint::VarUint32;
+use antelope::util::bytes_to_hex;
+use pyo3::exceptions::PyValueError;
 use pyo3::types::PyDict;
 use pyo3::{pyfunction, FromPyObject, PyResult};
-use pyo3::exceptions::PyValueError;
 use std::str::FromStr;
 
 use crate::proxies::checksums::{Checksum256, Sum256Like};
@@ -17,14 +19,15 @@ use pyo3::prelude::*;
 #[derive(FromPyObject)]
 pub struct PyPermissionLevel {
     actor: String,
-    permission: String
+    permission: String,
 }
 
 impl From<&PyPermissionLevel> for PyResult<PermissionLevel> {
     fn from(value: &PyPermissionLevel) -> Self {
         Ok(PermissionLevel::new(
             NativeName::from_str(&value.actor).map_err(|e| PyValueError::new_err(e.to_string()))?,
-            NativeName::from_str(&value.permission).map_err(|e| PyValueError::new_err(e.to_string()))?,
+            NativeName::from_str(&value.permission)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?,
         ))
     }
 }
@@ -45,8 +48,10 @@ impl From<&PyAction> for PyResult<Action> {
             auths.push(maybe_perm?);
         }
         Ok(Action {
-            account: NativeName::from_str(&py_action.account).map_err(|e| PyValueError::new_err(e.to_string()))?,
-            name: NativeName::from_str(&py_action.name).map_err(|e| PyValueError::new_err(e.to_string()))?,
+            account: NativeName::from_str(&py_action.account)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+            name: NativeName::from_str(&py_action.name)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?,
             authorization: auths,
             data: py_action.data.clone(),
         })
@@ -71,7 +76,7 @@ impl From<PyTransactionHeader> for TransactionHeader {
             ref_block_prefix: value.ref_block_prefix,
             max_net_usage_words: VarUint32::new(value.max_net_usage_words),
             max_cpu_usage_ms: value.max_cpu_usage_ms,
-            delay_sec: VarUint32::new(value.delay_sec)
+            delay_sec: VarUint32::new(value.delay_sec),
         }
     }
 }
@@ -106,11 +111,11 @@ pub fn sign_tx(
     let sign_data = transaction.signing_data(chain_id.raw());
     let signed_tx = SignedTransaction {
         transaction,
-        signatures: vec![
-            sign_key.inner.sign_message(&sign_data)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?
-        ],
-        context_free_data: vec![]
+        signatures: vec![sign_key
+            .inner
+            .sign_message(&sign_data)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?],
+        context_free_data: vec![],
     };
 
     // finally PackedTransaction is the payload to be broadcasted
@@ -123,7 +128,6 @@ pub fn sign_tx(
 
         let signatures: Vec<String> = tx.signatures.iter().map(|s| s.to_string()).collect();
         let packed_trx: String = bytes_to_hex(&tx.packed_transaction);
-
 
         dict_tx.set_item("signatures", signatures)?;
         dict_tx.set_item("compression", false)?;

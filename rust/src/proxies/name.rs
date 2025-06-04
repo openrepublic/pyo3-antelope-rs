@@ -24,7 +24,7 @@ pub enum NameLike {
     Num(u64),
     Raw([u8; 8]),
     Str(String),
-    Cls(Name)
+    Cls(Name),
 }
 
 impl From<Name> for NativeName {
@@ -47,12 +47,11 @@ impl Name {
     }
 
     #[staticmethod]
-    pub fn from_bytes(
-        buffer: &[u8]
-    ) -> PyResult<Self> {
+    pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
         let mut decoder = Decoder::new(buffer);
         let mut inner: NativeName = Default::default();
-        decoder.unpack(&mut inner)
+        decoder
+            .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(inner.into())
     }
@@ -71,7 +70,7 @@ impl Name {
             NameLike::Num(n) => Name::from_int(n),
             NameLike::Raw(raw) => Name::from_bytes(&raw),
             NameLike::Str(n_str) => Name::from_str_py(&n_str),
-            NameLike::Cls(n) => Ok(n.clone())
+            NameLike::Cls(n) => Ok(n.clone()),
         }
     }
 
@@ -86,7 +85,8 @@ impl Name {
     }
 
     fn __str__(&self) -> PyResult<String> {
-        self.inner.as_str()
+        self.inner
+            .as_str()
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 

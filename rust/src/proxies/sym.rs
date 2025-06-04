@@ -19,7 +19,7 @@ pub enum SymLike {
     Raw([u8; 8]),
     Str(String),
     Int(u64),
-    Cls(Symbol)
+    Cls(Symbol),
 }
 
 impl From<Symbol> for NativeSymbol {
@@ -37,12 +37,11 @@ impl From<NativeSymbol> for Symbol {
 #[pymethods]
 impl Symbol {
     #[staticmethod]
-    pub fn from_bytes(
-        buffer: &[u8]
-    ) -> PyResult<Self> {
+    pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
         let mut decoder = Decoder::new(buffer);
         let mut inner: NativeSymbol = Default::default();
-        decoder.unpack(&mut inner)
+        decoder
+            .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(inner.into())
     }
@@ -66,13 +65,15 @@ impl Symbol {
             SymLike::Raw(raw) => Symbol::from_bytes(&raw),
             SymLike::Str(s) => Symbol::from_str_py(&s),
             SymLike::Int(sym) => Symbol::from_int(sym),
-            SymLike::Cls(sym) => Ok(sym)
+            SymLike::Cls(sym) => Ok(sym),
         }
     }
 
     #[getter]
     pub fn code(&self) -> SymbolCode {
-        SymbolCode { inner: self.inner.code() }
+        SymbolCode {
+            inner: self.inner.code(),
+        }
     }
 
     #[getter]

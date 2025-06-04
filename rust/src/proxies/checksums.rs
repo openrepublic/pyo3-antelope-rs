@@ -17,7 +17,7 @@ pub struct Checksum160 {
 pub enum Sum160Like {
     Raw([u8; 20]),
     Str(String),
-    Cls(Checksum160)
+    Cls(Checksum160),
 }
 
 impl From<Checksum160> for NativeSum160 {
@@ -35,9 +35,7 @@ impl From<NativeSum160> for Checksum160 {
 #[pymethods]
 impl Checksum160 {
     #[staticmethod]
-    pub fn from_bytes(
-        data: [u8; 20],
-    ) -> PyResult<Self> {
+    pub fn from_bytes(data: [u8; 20]) -> PyResult<Self> {
         Ok(NativeSum160 { data }.into())
     }
 
@@ -54,13 +52,13 @@ impl Checksum160 {
         match value {
             Sum160Like::Raw(data) => Checksum160::from_bytes(data),
             Sum160Like::Str(s) => Checksum160::from_str_py(&s),
-            Sum160Like::Cls(sum) => Ok(sum)
+            Sum160Like::Cls(sum) => Ok(sum),
         }
     }
 
     #[getter]
     pub fn raw(&self) -> &[u8; 20] {
-       &self.inner.data
+        &self.inner.data
     }
 
     fn __str__(&self) -> String {
@@ -94,7 +92,7 @@ pub struct Checksum256 {
 pub enum Sum256Like {
     Raw([u8; 32]),
     Str(String),
-    Cls(Checksum256)
+    Cls(Checksum256),
 }
 
 impl From<Checksum256> for NativeSum256 {
@@ -112,9 +110,7 @@ impl From<NativeSum256> for Checksum256 {
 #[pymethods]
 impl Checksum256 {
     #[staticmethod]
-    pub fn from_bytes(
-        data: [u8; 32],
-    ) -> PyResult<Self> {
+    pub fn from_bytes(data: [u8; 32]) -> PyResult<Self> {
         Ok(NativeSum256 { data }.into())
     }
 
@@ -131,7 +127,7 @@ impl Checksum256 {
         match value {
             Sum256Like::Raw(data) => Checksum256::from_bytes(data),
             Sum256Like::Str(s) => Checksum256::from_str_py(&s),
-            Sum256Like::Cls(sum) => Ok(sum)
+            Sum256Like::Cls(sum) => Ok(sum),
         }
     }
 
@@ -171,7 +167,7 @@ pub struct Checksum512 {
 pub enum Sum512Like {
     Raw([u8; 64]),
     Str(String),
-    Cls(Checksum512)
+    Cls(Checksum512),
 }
 
 impl From<Checksum512> for NativeSum512 {
@@ -189,9 +185,7 @@ impl From<NativeSum512> for Checksum512 {
 #[pymethods]
 impl Checksum512 {
     #[staticmethod]
-    pub fn from_bytes(
-        data: [u8; 64],
-    ) -> PyResult<Self> {
+    pub fn from_bytes(data: [u8; 64]) -> PyResult<Self> {
         Ok(NativeSum512 { data }.into())
     }
 
@@ -208,7 +202,7 @@ impl Checksum512 {
         match value {
             Sum512Like::Raw(data) => Checksum512::from_bytes(data),
             Sum512Like::Str(s) => Checksum512::from_str_py(&s),
-            Sum512Like::Cls(sum) => Ok(sum)
+            Sum512Like::Cls(sum) => Ok(sum),
         }
     }
 

@@ -1,17 +1,15 @@
+use crate::serializer::{decode::decode_abi_type, encode::encode_abi_type};
 use antelope::chain::abi::{
-    ABITypeResolver, AbiStruct, AbiTableView, AbiVariant, ShipABI as NativeShipABI, ABI as NativeABI
+    ABITypeResolver, AbiStruct, AbiTableView, AbiVariant, ShipABI as NativeShipABI,
+    ABI as NativeABI,
 };
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
-use pyo3::exceptions::{PyValueError, PyTypeError};
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use serde::ser::Serialize;
 use serde_json::Serializer;
-use crate::serializer::{
-    encode::encode_abi_type,
-    decode::decode_abi_type
-};
 
 fn abi_struct_as_dict<'py>(py: Python<'py>, s: &AbiStruct) -> PyResult<Bound<'py, PyDict>> {
     let d = PyDict::new(py);
@@ -156,7 +154,7 @@ macro_rules! define_pyabi {
                 dict.set_item("is_struct", is_struct)?;
                 dict.set_item(
                     "modifiers".to_string(),
-                    PyList::new(py, res.modifiers.iter().map(|tm| tm.as_str()))?
+                    PyList::new(py, res.modifiers.iter().map(|tm| tm.as_str()))?,
                 )?;
 
                 Ok(dict)
@@ -168,7 +166,12 @@ macro_rules! define_pyabi {
                 Ok(encoder.get_bytes().to_vec())
             }
 
-            pub fn unpack<'py>(&self, py: Python<'py>, t: &str, buf: &[u8]) -> PyResult<Bound<'py, PyAny>> {
+            pub fn unpack<'py>(
+                &self,
+                py: Python<'py>,
+                t: &str,
+                buf: &[u8],
+            ) -> PyResult<Bound<'py, PyAny>> {
                 let mut decoder = Decoder::new(buf);
                 decode_abi_type(py, &self.inner, t, &mut decoder)
             }
@@ -206,4 +209,3 @@ macro_rules! define_pyabi {
 
 define_pyabi!(ABI, NativeABI);
 define_pyabi!(ShipABI, NativeShipABI);
-
