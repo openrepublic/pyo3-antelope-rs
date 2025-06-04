@@ -1,4 +1,4 @@
-use antelope::chain::name::Name as NativeName;
+use antelope::chain::name::Name;
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
@@ -7,13 +7,13 @@ use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
-#[pyclass(frozen)]
+#[pyclass(frozen, name = "Name")]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Name {
-    pub inner: NativeName,
+pub struct PyName {
+    pub inner: Name,
 }
 
-impl Hash for Name {
+impl Hash for PyName {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write_u64(self.inner.value())
     }
@@ -24,32 +24,32 @@ pub enum NameLike {
     Num(u64),
     Raw([u8; 8]),
     Str(String),
-    Cls(Name),
+    Cls(PyName),
 }
 
-impl From<Name> for NativeName {
-    fn from(value: Name) -> Self {
+impl From<PyName> for Name {
+    fn from(value: PyName) -> Self {
         value.inner
     }
 }
 
-impl From<NativeName> for Name {
-    fn from(value: NativeName) -> Self {
-        Name { inner: value }
+impl From<Name> for PyName {
+    fn from(value: Name) -> Self {
+        PyName { inner: value }
     }
 }
 
 #[pymethods]
-impl Name {
+impl PyName {
     #[staticmethod]
     pub fn from_int(value: u64) -> PyResult<Self> {
-        Ok(NativeName::from(value).into())
+        Ok(Name::from(value).into())
     }
 
     #[staticmethod]
     pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
         let mut decoder = Decoder::new(buffer);
-        let mut inner: NativeName = Default::default();
+        let mut inner: Name = Default::default();
         decoder
             .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
@@ -59,17 +59,17 @@ impl Name {
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        NativeName::from_str(s)
+        Name::from_str(s)
             .map(|n| n.into())
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     #[staticmethod]
-    pub fn try_from(value: NameLike) -> PyResult<Name> {
+    pub fn try_from(value: NameLike) -> PyResult<PyName> {
         match value {
-            NameLike::Num(n) => Name::from_int(n),
-            NameLike::Raw(raw) => Name::from_bytes(&raw),
-            NameLike::Str(n_str) => Name::from_str_py(&n_str),
+            NameLike::Num(n) => PyName::from_int(n),
+            NameLike::Raw(raw) => PyName::from_bytes(&raw),
+            NameLike::Str(n_str) => PyName::from_str_py(&n_str),
             NameLike::Cls(n) => Ok(n.clone()),
         }
     }
@@ -98,7 +98,7 @@ impl Name {
         self.inner.value()
     }
 
-    fn __richcmp__(&self, other: &Name, op: CompareOp) -> PyResult<bool> {
+    fn __richcmp__(&self, other: &PyName, op: CompareOp) -> PyResult<bool> {
         match op {
             CompareOp::Eq => Ok(self.inner == other.inner),
             CompareOp::Ne => Ok(self.inner != other.inner),
@@ -109,7 +109,7 @@ impl Name {
     }
 }
 
-impl Display for Name {
+impl Display for PyName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.inner)
     }

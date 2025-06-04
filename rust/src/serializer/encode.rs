@@ -24,15 +24,15 @@ use pyo3::{
 use thiserror::Error;
 
 use crate::proxies::{
-    asset::{Asset as PyAsset, ExtendedAsset as PyExtendedAsset},
+    asset::{PyAsset, PyExtendedAsset},
     checksums::{
-        Checksum160 as PyChecksum160, Checksum256 as PyChecksum256, Checksum512 as PyChecksum512,
+        PyChecksum160, PyChecksum256, PyChecksum512,
     },
-    name::Name as PyName,
-    public_key::PublicKey as PyPublicKey,
-    signature::Signature as PySignature,
-    sym::Symbol as PySymbol,
-    sym_code::SymbolCode as PySymbolCode,
+    name::PyName,
+    public_key::PyPublicKey,
+    signature::PySignature,
+    sym::PySymbol,
+    sym_code::PySymbolCode,
 };
 
 #[derive(Clone, Debug, Default)]

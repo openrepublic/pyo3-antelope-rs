@@ -1,41 +1,41 @@
-use antelope::chain::signature::Signature as NativeSig;
+use antelope::chain::signature::Signature;
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::str::FromStr;
 
-#[pyclass(frozen)]
+#[pyclass(frozen, name = "Signature")]
 #[derive(Debug, Clone)]
-pub struct Signature {
-    pub inner: NativeSig,
+pub struct PySignature {
+    pub inner: Signature,
 }
 
 #[derive(FromPyObject)]
 pub enum SigLike {
     Raw(Vec<u8>),
     Str(String),
-    Cls(Signature),
+    Cls(PySignature),
 }
 
-impl From<Signature> for NativeSig {
-    fn from(value: Signature) -> Self {
+impl From<PySignature> for Signature {
+    fn from(value: PySignature) -> Self {
         value.inner
     }
 }
 
-impl From<NativeSig> for Signature {
-    fn from(value: NativeSig) -> Self {
-        Signature { inner: value }
+impl From<Signature> for PySignature {
+    fn from(value: Signature) -> Self {
+        PySignature { inner: value }
     }
 }
 
 #[pymethods]
-impl Signature {
+impl PySignature {
     #[staticmethod]
     pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
         let mut decoder = Decoder::new(buffer);
-        let mut inner: NativeSig = Default::default();
+        let mut inner: Signature = Default::default();
         decoder
             .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
@@ -45,16 +45,16 @@ impl Signature {
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        NativeSig::from_str(s)
+        Signature::from_str(s)
             .map(|s| s.into())
             .map_err(PyValueError::new_err)
     }
 
     #[staticmethod]
-    pub fn try_from(value: SigLike) -> PyResult<Signature> {
+    pub fn try_from(value: SigLike) -> PyResult<PySignature> {
         match value {
-            SigLike::Raw(data) => Signature::from_bytes(&data),
-            SigLike::Str(s) => Signature::from_str_py(&s),
+            SigLike::Raw(data) => PySignature::from_bytes(&data),
+            SigLike::Str(s) => PySignature::from_str_py(&s),
             SigLike::Cls(key) => Ok(key),
         }
     }
@@ -69,7 +69,7 @@ impl Signature {
         self.inner.to_string()
     }
 
-    fn __richcmp__(&self, other: &Signature, op: CompareOp) -> PyResult<bool> {
+    fn __richcmp__(&self, other: &PySignature, op: CompareOp) -> PyResult<bool> {
         match op {
             CompareOp::Eq => Ok(self.inner == other.inner),
             CompareOp::Ne => Ok(self.inner != other.inner),

@@ -1,5 +1,5 @@
-use crate::proxies::private_key::PrivateKey;
-use antelope::chain::public_key::PublicKey as NativePublicKey;
+use crate::proxies::private_key::PyPrivateKey;
+use antelope::chain::public_key::PublicKey;
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
@@ -7,37 +7,37 @@ use pyo3::prelude::*;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::str::FromStr;
 
-#[pyclass(frozen)]
+#[pyclass(frozen, name = "PublicKey")]
 #[derive(Debug, Clone)]
-pub struct PublicKey {
-    pub inner: NativePublicKey,
+pub struct PyPublicKey {
+    pub inner: PublicKey,
 }
 
 #[derive(FromPyObject)]
 pub enum PubKeyLike {
     Raw(Vec<u8>),
     Str(String),
-    Cls(PublicKey),
+    Cls(PyPublicKey),
 }
 
-impl From<PublicKey> for NativePublicKey {
-    fn from(value: PublicKey) -> Self {
+impl From<PyPublicKey> for PublicKey {
+    fn from(value: PyPublicKey) -> Self {
         value.inner
     }
 }
 
-impl From<NativePublicKey> for PublicKey {
-    fn from(value: NativePublicKey) -> Self {
-        PublicKey { inner: value }
+impl From<PublicKey> for PyPublicKey {
+    fn from(value: PublicKey) -> Self {
+        PyPublicKey { inner: value }
     }
 }
 
 #[pymethods]
-impl PublicKey {
+impl PyPublicKey {
     #[staticmethod]
     pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
         let mut decoder = Decoder::new(buffer);
-        let mut inner: NativePublicKey = Default::default();
+        let mut inner: PublicKey = Default::default();
         decoder
             .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
@@ -47,13 +47,13 @@ impl PublicKey {
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        NativePublicKey::from_str(s)
+        PublicKey::from_str(s)
             .map(|k| k.into())
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     #[staticmethod]
-    pub fn from_priv(p: &PrivateKey) -> PyResult<Self> {
+    pub fn from_priv(p: &PyPrivateKey) -> PyResult<Self> {
         p.inner.to_public().map(|k| k.into()).map_err(|e| {
             PyValueError::new_err(format!(
                 "Error while extracting public key from private: {e}"
@@ -62,10 +62,10 @@ impl PublicKey {
     }
 
     #[staticmethod]
-    pub fn try_from(value: PubKeyLike) -> PyResult<PublicKey> {
+    pub fn try_from(value: PubKeyLike) -> PyResult<PyPublicKey> {
         match value {
-            PubKeyLike::Raw(data) => PublicKey::from_bytes(&data),
-            PubKeyLike::Str(s) => PublicKey::from_str_py(&s),
+            PubKeyLike::Raw(data) => PyPublicKey::from_bytes(&data),
+            PubKeyLike::Str(s) => PyPublicKey::from_str_py(&s),
             PubKeyLike::Cls(key) => Ok(key),
         }
     }
@@ -92,7 +92,7 @@ impl PublicKey {
         h.finish()
     }
 
-    fn __richcmp__(&self, other: &PublicKey, op: CompareOp) -> PyResult<bool> {
+    fn __richcmp__(&self, other: &PyPublicKey, op: CompareOp) -> PyResult<bool> {
         match op {
             CompareOp::Eq => Ok(self.inner == other.inner),
             CompareOp::Ne => Ok(self.inner != other.inner),

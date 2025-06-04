@@ -12,8 +12,8 @@ use pyo3::types::PyDict;
 use pyo3::{pyfunction, FromPyObject, PyResult};
 use std::str::FromStr;
 
-use crate::proxies::checksums::{Checksum256, Sum256Like};
-use crate::proxies::private_key::PrivateKey;
+use crate::proxies::checksums::{PyChecksum256, Sum256Like};
+use crate::proxies::private_key::PyPrivateKey;
 use pyo3::prelude::*;
 
 #[derive(FromPyObject)]
@@ -86,10 +86,10 @@ pub fn sign_tx(
     chain_id: Sum256Like,
     header: PyTransactionHeader,
     actions: Vec<PyAction>,
-    sign_key: &PrivateKey,
+    sign_key: &PyPrivateKey,
 ) -> PyResult<Py<PyDict>> {
     // convert to valid checksum256
-    let chain_id = Checksum256::try_from(chain_id)?;
+    let chain_id = PyChecksum256::try_from(chain_id)?;
 
     // convert py actions into native
     let mut _actions: Vec<Action> = Vec::with_capacity(actions.len());

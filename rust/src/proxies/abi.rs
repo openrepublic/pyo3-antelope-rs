@@ -1,7 +1,6 @@
 use crate::serializer::{decode::decode_abi_type, encode::encode_abi_type};
 use antelope::chain::abi::{
-    ABITypeResolver, AbiStruct, AbiTableView, AbiVariant, ShipABI as NativeShipABI,
-    ABI as NativeABI,
+    ABITypeResolver, AbiStruct, AbiTableView, AbiVariant, ShipABI, ABI,
 };
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
@@ -34,8 +33,8 @@ fn abi_variant_as_dict<'py>(py: Python<'py>, v: &AbiVariant) -> PyResult<Bound<'
 }
 
 macro_rules! define_pyabi {
-    ($wrapper:ident, $inner:path) => {
-        #[pyclass(frozen)]
+    ($wrapper:ident, $pyname:literal, $inner:path) => {
+        #[pyclass(frozen, name = $pyname)]
         #[derive(Debug, Clone)]
         pub struct $wrapper {
             pub inner: $inner,
@@ -207,5 +206,5 @@ macro_rules! define_pyabi {
     };
 }
 
-define_pyabi!(ABI, NativeABI);
-define_pyabi!(ShipABI, NativeShipABI);
+define_pyabi!(PyABI, "ABI", ABI);
+define_pyabi!(PyShipABI, "ShipABI", ShipABI);

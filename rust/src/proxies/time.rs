@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use antelope::chain::time::{
-    TimePoint as NativeTimePoint, TimePointSec as NativeTimePointSec, BlockTimestamp as NativeBlockTimestamp
+    TimePoint, TimePointSec, BlockTimestamp
 };
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
@@ -10,10 +10,10 @@ use pyo3::prelude::*;
 
 use std::str::FromStr;
 
-#[pyclass(frozen)]
+#[pyclass(frozen, name = "TimePoint")]
 #[derive(Debug, Clone)]
-pub struct TimePoint {
-    pub inner: NativeTimePoint,
+pub struct PyTimePoint {
+    pub inner: TimePoint,
 }
 
 #[derive(FromPyObject)]
@@ -21,27 +21,27 @@ pub enum TimePointLike {
     Raw([u8; 8]),
     Int(u64),
     Str(String),
-    Cls(TimePoint),
+    Cls(PyTimePoint),
 }
 
-impl From<TimePoint> for NativeTimePoint {
-    fn from(value: TimePoint) -> Self {
+impl From<PyTimePoint> for TimePoint {
+    fn from(value: PyTimePoint) -> Self {
         value.inner
     }
 }
 
-impl From<NativeTimePoint> for TimePoint {
-    fn from(value: NativeTimePoint) -> Self {
-        TimePoint { inner: value }
+impl From<TimePoint> for PyTimePoint {
+    fn from(value: TimePoint) -> Self {
+        PyTimePoint { inner: value }
     }
 }
 
 #[pymethods]
-impl TimePoint {
+impl PyTimePoint {
     #[staticmethod]
     pub fn from_bytes(buffer: [u8; 8]) -> PyResult<Self> {
         let mut decoder = Decoder::new(&buffer);
-        let mut inner: NativeTimePoint = Default::default();
+        let mut inner: TimePoint = Default::default();
         decoder
             .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
@@ -50,23 +50,23 @@ impl TimePoint {
 
     #[staticmethod]
     pub fn from_int(num: u64) -> Self {
-        NativeTimePoint::from(num).into()
+        TimePoint::from(num).into()
     }
 
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        NativeTimePoint::from_str(s)
+        TimePoint::from_str(s)
             .map(|sum| sum.into())
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
 
     #[staticmethod]
-    pub fn try_from(value: TimePointLike) -> PyResult<TimePoint> {
+    pub fn try_from(value: TimePointLike) -> PyResult<PyTimePoint> {
         match value {
-            TimePointLike::Raw(data) => TimePoint::from_bytes(data),
-            TimePointLike::Int(num) => Ok(TimePoint::from_int(num)),
-            TimePointLike::Str(s) => TimePoint::from_str_py(&s),
+            TimePointLike::Raw(data) => PyTimePoint::from_bytes(data),
+            TimePointLike::Int(num) => Ok(PyTimePoint::from_int(num)),
+            TimePointLike::Str(s) => PyTimePoint::from_str_py(&s),
             TimePointLike::Cls(sum) => Ok(sum),
         }
     }
@@ -81,7 +81,7 @@ impl TimePoint {
         self.inner.to_string()
     }
 
-    fn __richcmp__(&self, other: PyRef<TimePoint>, op: CompareOp) -> PyResult<bool> {
+    fn __richcmp__(&self, other: PyRef<PyTimePoint>, op: CompareOp) -> PyResult<bool> {
         match op {
             CompareOp::Eq => Ok(self.inner == other.inner),
             CompareOp::Ne => Ok(self.inner != other.inner),
@@ -92,7 +92,7 @@ impl TimePoint {
     }
 }
 
-impl Display for TimePoint {
+impl Display for PyTimePoint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.inner)
     }

@@ -1,6 +1,6 @@
-use crate::proxies::public_key::PublicKey;
+use crate::proxies::public_key::PyPublicKey;
 use antelope::chain::key_type::KeyType;
-use antelope::chain::private_key::PrivateKey as NativePrivateKey;
+use antelope::chain::private_key::PrivateKey;
 use antelope::serializer::{Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -8,55 +8,55 @@ use pyo3::prelude::*;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::str::FromStr;
 
-#[pyclass(frozen)]
+#[pyclass(frozen, name = "PrivateKey")]
 #[derive(Debug, Clone)]
-pub struct PrivateKey {
-    pub inner: NativePrivateKey,
+pub struct PyPrivateKey {
+    pub inner: PrivateKey,
 }
 
 #[derive(FromPyObject)]
 pub enum PrivKeyLike {
     Raw(Vec<u8>),
     Str(String),
-    Cls(PrivateKey),
+    Cls(PyPrivateKey),
 }
 
-impl From<PrivateKey> for NativePrivateKey {
-    fn from(value: PrivateKey) -> Self {
+impl From<PyPrivateKey> for PrivateKey {
+    fn from(value: PyPrivateKey) -> Self {
         value.inner
     }
 }
 
-impl From<NativePrivateKey> for PrivateKey {
-    fn from(value: NativePrivateKey) -> Self {
-        PrivateKey { inner: value }
+impl From<PrivateKey> for PyPrivateKey {
+    fn from(value: PrivateKey) -> Self {
+        PyPrivateKey { inner: value }
     }
 }
 
 #[pymethods]
-impl PrivateKey {
+impl PyPrivateKey {
     #[staticmethod]
     pub fn from_bytes(raw: &[u8]) -> PyResult<Self> {
         // Packer type decoding is not used because private_key doesn't implement the trait
         let key_type =
             KeyType::try_from(raw[0]).map_err(|e| PyValueError::new_err(e.to_string()))?;
 
-        Ok(NativePrivateKey::from((raw[1..].to_vec(), key_type)).into())
+        Ok(PrivateKey::from((raw[1..].to_vec(), key_type)).into())
     }
 
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        NativePrivateKey::from_str(s)
+        PrivateKey::from_str(s)
             .map(|k| k.into())
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     #[staticmethod]
-    pub fn try_from(value: PrivKeyLike) -> PyResult<PrivateKey> {
+    pub fn try_from(value: PrivKeyLike) -> PyResult<PyPrivateKey> {
         match value {
-            PrivKeyLike::Raw(data) => PrivateKey::from_bytes(&data),
-            PrivKeyLike::Str(s) => PrivateKey::from_str_py(&s),
+            PrivKeyLike::Raw(data) => PyPrivateKey::from_bytes(&data),
+            PrivKeyLike::Str(s) => PyPrivateKey::from_str_py(&s),
             PrivKeyLike::Cls(key) => Ok(key),
         }
     }
@@ -66,18 +66,18 @@ impl PrivateKey {
         let key_type = KeyType::try_from(key_type)
             .map_err(|e| PyValueError::new_err(format!("Invalid key type format {e}")))?;
 
-        let inner = NativePrivateKey::random(key_type)
+        let inner = PrivateKey::random(key_type)
             .map_err(|e| PyValueError::new_err(format!("Invalid key format {e}")))?;
 
-        Ok(PrivateKey { inner })
+        Ok(PyPrivateKey { inner })
     }
 
     pub fn value(&self) -> &[u8] {
         self.inner.value.as_slice()
     }
 
-    pub fn get_public(&self) -> PyResult<PublicKey> {
-        Ok(PublicKey {
+    pub fn get_public(&self) -> PyResult<PyPublicKey> {
+        Ok(PyPublicKey {
             inner: self
                 .inner
                 .to_public()
@@ -111,7 +111,7 @@ impl PrivateKey {
         h.finish()
     }
 
-    fn __richcmp__(&self, other: &PrivateKey, op: CompareOp) -> PyResult<bool> {
+    fn __richcmp__(&self, other: &PyPrivateKey, op: CompareOp) -> PyResult<bool> {
         match op {
             CompareOp::Eq => Ok(self.inner == other.inner),
             CompareOp::Ne => Ok(self.inner != other.inner),

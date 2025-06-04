@@ -1,5 +1,5 @@
-use crate::proxies::sym_code::SymbolCode;
-use antelope::chain::asset::Symbol as NativeSymbol;
+use crate::proxies::sym_code::PySymbolCode;
+use antelope::chain::asset::Symbol;
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
@@ -7,10 +7,10 @@ use pyo3::prelude::*;
 use std::fmt::Display;
 use std::str::FromStr;
 
-#[pyclass(frozen)]
+#[pyclass(frozen, name = "Symbol")]
 #[derive(Debug, Clone)]
-pub struct Symbol {
-    pub inner: NativeSymbol,
+pub struct PySymbol {
+    pub inner: Symbol,
 }
 
 #[derive(Debug, Clone, FromPyObject)]
@@ -18,27 +18,27 @@ pub enum SymLike {
     Raw([u8; 8]),
     Str(String),
     Int(u64),
-    Cls(Symbol),
+    Cls(PySymbol),
 }
 
-impl From<Symbol> for NativeSymbol {
-    fn from(value: Symbol) -> Self {
+impl From<PySymbol> for Symbol {
+    fn from(value: PySymbol) -> Self {
         value.inner
     }
 }
 
-impl From<NativeSymbol> for Symbol {
-    fn from(value: NativeSymbol) -> Self {
-        Symbol { inner: value }
+impl From<Symbol> for PySymbol {
+    fn from(value: Symbol) -> Self {
+        PySymbol { inner: value }
     }
 }
 
 #[pymethods]
-impl Symbol {
+impl PySymbol {
     #[staticmethod]
     pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
         let mut decoder = Decoder::new(buffer);
-        let mut inner: NativeSymbol = Default::default();
+        let mut inner: Symbol = Default::default();
         decoder
             .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
@@ -48,29 +48,29 @@ impl Symbol {
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        NativeSymbol::from_str(s)
+        Symbol::from_str(s)
             .map(|s| s.into())
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     #[staticmethod]
     pub fn from_int(sym: u64) -> PyResult<Self> {
-        Ok(NativeSymbol::from(sym).into())
+        Ok(Symbol::from(sym).into())
     }
 
     #[staticmethod]
-    pub fn try_from(value: SymLike) -> PyResult<Symbol> {
+    pub fn try_from(value: SymLike) -> PyResult<PySymbol> {
         match value {
-            SymLike::Raw(raw) => Symbol::from_bytes(&raw),
-            SymLike::Str(s) => Symbol::from_str_py(&s),
-            SymLike::Int(sym) => Symbol::from_int(sym),
+            SymLike::Raw(raw) => PySymbol::from_bytes(&raw),
+            SymLike::Str(s) => PySymbol::from_str_py(&s),
+            SymLike::Int(sym) => PySymbol::from_int(sym),
             SymLike::Cls(sym) => Ok(sym),
         }
     }
 
     #[getter]
-    pub fn code(&self) -> SymbolCode {
-        SymbolCode {
+    pub fn code(&self) -> PySymbolCode {
+        PySymbolCode {
             inner: self.inner.code(),
         }
     }
@@ -99,7 +99,7 @@ impl Symbol {
         self.inner.value()
     }
 
-    fn __richcmp__(&self, other: PyRef<Symbol>, op: CompareOp) -> PyResult<bool> {
+    fn __richcmp__(&self, other: PyRef<PySymbol>, op: CompareOp) -> PyResult<bool> {
         match op {
             CompareOp::Eq => Ok(self.inner == other.inner),
             CompareOp::Ne => Ok(self.inner != other.inner),
@@ -110,7 +110,7 @@ impl Symbol {
     }
 }
 
-impl Display for Symbol {
+impl Display for PySymbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.inner)
     }

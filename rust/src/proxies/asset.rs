@@ -1,4 +1,4 @@
-use antelope::chain::asset::{Asset as NativeAsset, ExtendedAsset as NativeExtAsset};
+use antelope::chain::asset::{Asset, ExtendedAsset};
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyKeyError, PyValueError};
@@ -9,14 +9,14 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 use crate::proxies::{
-    name::{Name, NameLike},
-    sym::{SymLike, Symbol},
+    name::{PyName, NameLike},
+    sym::{PySymbol, SymLike},
 };
 
-#[pyclass(frozen)]
+#[pyclass(frozen, name = "Asset")]
 #[derive(Debug, Clone)]
-pub struct Asset {
-    pub inner: NativeAsset,
+pub struct PyAsset {
+    pub inner: Asset,
 }
 
 #[derive(FromPyObject)]
@@ -26,27 +26,27 @@ pub enum AssetLike<'py> {
     Int(i64, SymLike),
     Decimal(Decimal, SymLike),
     Dict(Bound<'py, PyDict>),
-    Cls(Asset),
+    Cls(PyAsset),
 }
 
-impl From<Asset> for NativeAsset {
-    fn from(value: Asset) -> Self {
+impl From<PyAsset> for Asset {
+    fn from(value: PyAsset) -> Self {
         value.inner
     }
 }
 
-impl From<NativeAsset> for Asset {
-    fn from(value: NativeAsset) -> Self {
-        Asset { inner: value }
+impl From<Asset> for PyAsset {
+    fn from(value: Asset) -> Self {
+        PyAsset { inner: value }
     }
 }
 
 #[pymethods]
-impl Asset {
+impl PyAsset {
     #[new]
     fn new(amount: i64, sym: SymLike) -> PyResult<Self> {
-        let sym = Symbol::try_from(sym)?;
-        NativeAsset::try_from((amount, sym.inner))
+        let sym = PySymbol::try_from(sym)?;
+        Asset::try_from((amount, sym.inner))
             .map(|a| a.into())
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
@@ -54,7 +54,7 @@ impl Asset {
     #[staticmethod]
     pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
         let mut decoder = Decoder::new(buffer);
-        let mut inner: NativeAsset = Default::default();
+        let mut inner: Asset = Default::default();
         decoder
             .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
@@ -63,20 +63,20 @@ impl Asset {
 
     #[staticmethod]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        NativeAsset::from_str(s)
+        Asset::from_str(s)
             .map(|a| a.into())
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     #[staticmethod]
     pub fn from_decimal(d: Decimal, sym: SymLike) -> PyResult<Self> {
-        let sym = Symbol::try_from(sym)?;
+        let sym = PySymbol::try_from(sym)?;
 
         let d_str = d.to_string().replace(".", "");
         let amount = i64::from_str(&d_str)
             .map_err(|e| PyValueError::new_err(format!("Decimal not valid i64: {e}")))?;
 
-        Asset::new(amount, SymLike::Cls(sym))
+        PyAsset::new(amount, SymLike::Cls(sym))
     }
 
     #[staticmethod]
@@ -95,17 +95,17 @@ impl Asset {
             ))?
             .extract()?;
 
-        Asset::new(py_amount, py_symbol)
+        PyAsset::new(py_amount, py_symbol)
     }
 
     #[staticmethod]
-    pub fn try_from<'py>(value: AssetLike<'py>) -> PyResult<Asset> {
+    pub fn try_from<'py>(value: AssetLike<'py>) -> PyResult<PyAsset> {
         match value {
-            AssetLike::Raw(raw) => Asset::from_bytes(&raw),
-            AssetLike::Str(s) => Asset::from_str_py(&s),
-            AssetLike::Int(amount, sym) => Asset::new(amount, sym),
-            AssetLike::Decimal(d, sym) => Asset::from_decimal(d, sym),
-            AssetLike::Dict(d) => Asset::from_dict(d),
+            AssetLike::Raw(raw) => PyAsset::from_bytes(&raw),
+            AssetLike::Str(s) => PyAsset::from_str_py(&s),
+            AssetLike::Int(amount, sym) => PyAsset::new(amount, sym),
+            AssetLike::Decimal(d, sym) => PyAsset::from_decimal(d, sym),
+            AssetLike::Dict(d) => PyAsset::from_dict(d),
             AssetLike::Cls(asset) => Ok(asset),
         }
     }
@@ -137,8 +137,8 @@ impl Asset {
     }
 
     #[getter]
-    pub fn symbol(&self) -> Symbol {
-        Symbol {
+    pub fn symbol(&self) -> PySymbol {
+        PySymbol {
             inner: self.inner.symbol(),
         }
     }
@@ -147,7 +147,7 @@ impl Asset {
         self.inner.to_string()
     }
 
-    fn __richcmp__(&self, other: PyRef<Asset>, op: CompareOp) -> PyResult<bool> {
+    fn __richcmp__(&self, other: PyRef<PyAsset>, op: CompareOp) -> PyResult<bool> {
         match op {
             CompareOp::Eq => Ok(self.inner == other.inner),
             CompareOp::Ne => Ok(self.inner != other.inner),
@@ -157,33 +157,33 @@ impl Asset {
         }
     }
 
-    fn __add__(&self, other: &Asset) -> PyResult<Asset> {
+    fn __add__(&self, other: &PyAsset) -> PyResult<PyAsset> {
         let result = self
             .inner
             .try_add(other.inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(Asset { inner: result })
+        Ok(PyAsset { inner: result })
     }
 
-    fn __sub__(&self, other: &Asset) -> PyResult<Asset> {
+    fn __sub__(&self, other: &PyAsset) -> PyResult<PyAsset> {
         let result = self
             .inner
             .try_sub(other.inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(Asset { inner: result })
+        Ok(PyAsset { inner: result })
     }
 }
 
-impl Display for Asset {
+impl Display for PyAsset {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.inner)
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, name = "ExtendedAsset")]
 #[derive(Debug, Clone)]
-pub struct ExtendedAsset {
-    pub inner: NativeExtAsset,
+pub struct PyExtendedAsset {
+    pub inner: ExtendedAsset,
 }
 
 #[derive(FromPyObject)]
@@ -191,30 +191,30 @@ pub enum ExtAssetLike<'py> {
     Raw([u8; 24]),
     Str(String),
     Dict(Bound<'py, PyDict>),
-    Cls(ExtendedAsset),
+    Cls(PyExtendedAsset),
 }
 
-impl From<ExtendedAsset> for NativeExtAsset {
-    fn from(value: ExtendedAsset) -> Self {
-        NativeExtAsset {
+impl From<PyExtendedAsset> for ExtendedAsset {
+    fn from(value: PyExtendedAsset) -> Self {
+        ExtendedAsset {
             quantity: value.inner.quantity,
             contract: value.inner.contract,
         }
     }
 }
 
-impl From<NativeExtAsset> for ExtendedAsset {
-    fn from(value: NativeExtAsset) -> Self {
-        ExtendedAsset { inner: value }
+impl From<ExtendedAsset> for PyExtendedAsset {
+    fn from(value: ExtendedAsset) -> Self {
+        PyExtendedAsset { inner: value }
     }
 }
 
 #[pymethods]
-impl ExtendedAsset {
+impl PyExtendedAsset {
     #[staticmethod]
     pub fn from_bytes(buffer: &[u8]) -> ::pyo3::PyResult<Self> {
         let mut decoder = Decoder::new(buffer);
-        let mut inner: NativeExtAsset = Default::default();
+        let mut inner: ExtendedAsset = Default::default();
         decoder
             .unpack(&mut inner)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
@@ -224,14 +224,14 @@ impl ExtendedAsset {
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        let ext = NativeExtAsset::from_str(s).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let ext = ExtendedAsset::from_str(s).map_err(|e| PyValueError::new_err(e.to_string()))?;
 
         Ok(ext.into())
     }
 
     #[staticmethod]
     pub fn from_dict<'py>(d: Bound<'py, PyDict>) -> PyResult<Self> {
-        let quantity = Asset::try_from(
+        let quantity = PyAsset::try_from(
             d.get_item("quantity")?
                 .ok_or(PyKeyError::new_err(
                     "Expected asset dict to have amount key",
@@ -239,7 +239,7 @@ impl ExtendedAsset {
                 .extract::<AssetLike>()?,
         )?;
 
-        let contract = Name::try_from(
+        let contract = PyName::try_from(
             d.get_item("contract")?
                 .ok_or(PyKeyError::new_err(
                     "Expected asset dict to have amount key",
@@ -247,7 +247,7 @@ impl ExtendedAsset {
                 .extract::<NameLike>()?,
         )?;
 
-        Ok(NativeExtAsset {
+        Ok(ExtendedAsset {
             quantity: quantity.inner,
             contract: contract.inner,
         }
@@ -255,11 +255,11 @@ impl ExtendedAsset {
     }
 
     #[staticmethod]
-    pub fn try_from<'py>(value: ExtAssetLike<'py>) -> PyResult<ExtendedAsset> {
+    pub fn try_from<'py>(value: ExtAssetLike<'py>) -> PyResult<PyExtendedAsset> {
         match value {
-            ExtAssetLike::Raw(raw) => ExtendedAsset::from_bytes(&raw),
-            ExtAssetLike::Str(s) => ExtendedAsset::from_str_py(&s),
-            ExtAssetLike::Dict(d) => ExtendedAsset::from_dict(d),
+            ExtAssetLike::Raw(raw) => PyExtendedAsset::from_bytes(&raw),
+            ExtAssetLike::Str(s) => PyExtendedAsset::from_str_py(&s),
+            ExtAssetLike::Dict(d) => PyExtendedAsset::from_dict(d),
             ExtAssetLike::Cls(ext_asset) => Ok(ext_asset),
         }
     }
@@ -274,28 +274,28 @@ impl ExtendedAsset {
         self.inner.to_string()
     }
 
-    fn __add__(&self, other: &ExtendedAsset) -> PyResult<ExtendedAsset> {
+    fn __add__(&self, other: &PyExtendedAsset) -> PyResult<PyExtendedAsset> {
         let result = self
             .inner
             .quantity
             .try_add(other.inner.quantity)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
-        Ok(NativeExtAsset {
+        Ok(ExtendedAsset {
             quantity: result,
             contract: other.inner.contract,
         }
         .into())
     }
 
-    fn __sub__(&self, other: &ExtendedAsset) -> PyResult<ExtendedAsset> {
+    fn __sub__(&self, other: &PyExtendedAsset) -> PyResult<PyExtendedAsset> {
         let result = self
             .inner
             .quantity
             .try_sub(other.inner.quantity)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
-        Ok(NativeExtAsset {
+        Ok(ExtendedAsset {
             quantity: result,
             contract: other.inner.contract,
         }
@@ -303,7 +303,7 @@ impl ExtendedAsset {
     }
 }
 
-impl Display for ExtendedAsset {
+impl Display for PyExtendedAsset {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.inner)
     }
