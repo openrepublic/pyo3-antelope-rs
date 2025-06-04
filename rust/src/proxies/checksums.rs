@@ -59,8 +59,8 @@ impl Checksum160 {
     }
 
     #[getter]
-    pub fn raw(&self) -> [u8; 20] {
-        self.inner.data
+    pub fn raw(&self) -> &[u8; 20] {
+       &self.inner.data
     }
 
     fn __str__(&self) -> String {
@@ -136,8 +136,8 @@ impl Checksum256 {
     }
 
     #[getter]
-    pub fn raw(&self) -> [u8; 32] {
-        self.inner.data
+    pub fn raw(&self) -> &[u8; 32] {
+        &self.inner.data
     }
 
     fn __str__(&self) -> String {
@@ -213,8 +213,8 @@ impl Checksum512 {
     }
 
     #[getter]
-    pub fn raw(&self) -> [u8; 64] {
-        self.inner.data
+    pub fn raw(&self) -> &[u8; 64] {
+        &self.inner.data
     }
 
     fn __str__(&self) -> String {
