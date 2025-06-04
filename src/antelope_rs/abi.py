@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from __future__ import annotations
 
+import json
 import hashlib
 
 from typing import (
@@ -41,6 +42,35 @@ from ._lowlevel import (
 
 
 # msgspec compatible type hints for different string fields in ABI definitions
+
+# raw uint64
+Int64Bytes = Annotated[
+    bytes,
+    Meta(
+        min_length=8,
+        max_length=8
+    )
+]
+
+NameBytes = Int64Bytes
+SymbolBytes = Int64Bytes
+SymCodeBytes = Int64Bytes
+
+# raw asset & extended_asset
+AssetBytes = Annotated[
+    bytes,
+    Meta(
+        min_length=16,
+        max_length=16
+    )
+]
+ExtAssetBytes = Annotated[
+    bytes,
+    Meta(
+        min_length=24,
+        max_length=24
+    )
+]
 
 # type names, alphanumeric can have multiple modifiers (?, $ & []) at the end
 regex_type_name = r'^([A-Za-z_][A-Za-z0-9_]*)(?:\[\]|\?|\$)*$'
@@ -118,6 +148,30 @@ Sum512Str = Annotated[
     )
 ]
 
+# checksum bytes
+Sum160Bytes = Annotated[
+    bytes,
+    Meta(
+        min_length=20,
+        max_length=20
+    )
+]
+
+Sum256Bytes = Annotated[
+    bytes,
+    Meta(
+        min_length=32,
+        max_length=32
+    )
+]
+
+Sum512Bytes = Annotated[
+    bytes,
+    Meta(
+        min_length=64,
+        max_length=64
+    )
+]
 
 TypeModifier = Literal['optional'] | Literal['extension'] | Literal['array']
 TypeSuffix = Literal['?'] | Literal['$'] | Literal['[]']
@@ -181,11 +235,31 @@ class ABIResolvedType(Struct, frozen=True):
 
 # ABI & ShipABI highlevel patching
 
+ABILike = bytes | str | dict | ABI | ShipABI
+
 # classmethods
 def _from_file(cls, p: Path | str):
     return cls.from_str(
         Path(p).read_text()
     )
+
+def _try_from(cls, abi: ABILike):
+    if isinstance(abi, cls):
+        return abi
+
+    if isinstance(abi, bytes):
+        return cls.from_bytes(abi)
+
+    if isinstance(abi, dict):
+        abi = json.dumps(abi)
+
+    if isinstance(abi, str):
+        return cls.from_bytes(abi)
+
+    raise TypeError(
+        f'Wrong type for abi creation expected ABILike but got {type(abi).__name__}'
+    )
+
 
 # properties
 def _types(self) -> list[AliasDef]:
@@ -260,6 +334,7 @@ def _apply_to_abi_classes(attr_name: str, fn):
 
 _class_methods = [
     ('from_file', _from_file),
+    ('try_from', _try_from)
 ]
 
 _properties = [
@@ -283,9 +358,6 @@ for name, fn in _properties:
 
 for name, fn in _methods:
     _apply_to_abi_classes(name, fn)
-
-
-ABILike = bytes | str | dict | ABI | ShipABI
 
 
 # ABIView:

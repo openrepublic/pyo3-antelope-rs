@@ -1,80 +1,117 @@
-use crate::impl_packable_py;
-use crate::proxies::sym_code::SymbolCode;
-use antelope::chain::asset::Symbol as NativeSymbol;
-use antelope::serializer::Packer;
+use crate::proxies::sym_code::PySymbolCode;
+use antelope::chain::asset::Symbol;
+use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use std::fmt::Display;
 use std::str::FromStr;
 
-#[pyclass]
+#[pyclass(frozen, name = "Symbol")]
 #[derive(Debug, Clone)]
-pub struct Symbol {
-    pub inner: NativeSymbol,
+pub struct PySymbol {
+    pub inner: Symbol,
 }
 
-#[derive(FromPyObject)]
+#[derive(Debug, Clone, FromPyObject)]
 pub enum SymLike {
+    Raw([u8; 8]),
     Str(String),
     Int(u64),
-    Cls(Symbol)
+    Cls(PySymbol),
 }
 
+impl From<PySymbol> for Symbol {
+    fn from(value: PySymbol) -> Self {
+        value.inner
+    }
+}
 
-impl_packable_py! {
-    impl Symbol(NativeSymbol) {
-        #[staticmethod]
-        pub fn try_from(value: SymLike) -> PyResult<Symbol> {
-            match value {
-                SymLike::Str(s) => Symbol::from_str(&s),
-                SymLike::Int(sym) => Symbol::from_int(sym),
-                SymLike::Cls(sym) => Ok(sym)
-            }
-        }
+impl From<Symbol> for PySymbol {
+    fn from(value: Symbol) -> Self {
+        PySymbol { inner: value }
+    }
+}
 
-        #[staticmethod]
-        pub fn from_str(s: &str) -> PyResult<Self> {
-            Ok(Symbol { inner: NativeSymbol::from_str(s)
-                .map_err(|e| PyValueError::new_err(e.to_string()))? })
-        }
+#[pymethods]
+impl PySymbol {
+    #[staticmethod]
+    pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
+        let mut decoder = Decoder::new(buffer);
+        let mut inner: Symbol = Default::default();
+        decoder
+            .unpack(&mut inner)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(inner.into())
+    }
 
-        #[staticmethod]
-        pub fn from_int(sym: u64) -> PyResult<Self> {
-            Ok(Symbol { inner: NativeSymbol::try_from(sym)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?})
-        }
+    #[staticmethod]
+    #[pyo3(name = "from_str")]
+    pub fn from_str_py(s: &str) -> PyResult<Self> {
+        Symbol::from_str(s)
+            .map(|s| s.into())
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
 
-        #[getter]
-        pub fn code(&self) -> SymbolCode {
-            SymbolCode { inner: self.inner.code() }
-        }
+    #[staticmethod]
+    pub fn from_int(sym: u64) -> PyResult<Self> {
+        Ok(Symbol::from(sym).into())
+    }
 
-        #[getter]
-        pub fn precision(&self) -> u8 {
-            self.inner.precision()
+    #[staticmethod]
+    pub fn try_from(value: SymLike) -> PyResult<PySymbol> {
+        match value {
+            SymLike::Raw(raw) => PySymbol::from_bytes(&raw),
+            SymLike::Str(s) => PySymbol::from_str_py(&s),
+            SymLike::Int(sym) => PySymbol::from_int(sym),
+            SymLike::Cls(sym) => Ok(sym),
         }
+    }
 
-        #[getter]
-        fn unit(&self) -> f64 {
-            1.0 / (10u64.pow(self.precision() as u32) as f64)
+    #[getter]
+    pub fn code(&self) -> PySymbolCode {
+        PySymbolCode {
+            inner: self.inner.code(),
         }
+    }
 
-        fn __str__(&self) -> String {
-            self.inner.to_string()
-        }
+    #[getter]
+    pub fn precision(&self) -> u8 {
+        self.inner.precision()
+    }
 
-        fn __int__(&self) -> u64 {
-            self.inner.value()
-        }
+    #[getter]
+    fn unit(&self) -> f64 {
+        1.0 / (10u64.pow(self.precision() as u32) as f64)
+    }
 
-        fn __richcmp__(&self, other: PyRef<Symbol>, op: CompareOp) -> PyResult<bool> {
-            match op {
-                CompareOp::Eq => Ok(self.inner == other.inner),
-                CompareOp::Ne => Ok(self.inner != other.inner),
-                _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                    "Operation not implemented",
-                )),
-            }
+    pub fn encode(&self) -> Vec<u8> {
+        let mut encoder = Encoder::new(0);
+        self.inner.pack(&mut encoder);
+        encoder.get_bytes().to_vec()
+    }
+
+    fn __str__(&self) -> String {
+        self.inner.to_string()
+    }
+
+    fn __int__(&self) -> u64 {
+        self.inner.value()
+    }
+
+    fn __richcmp__(&self, other: PyRef<PySymbol>, op: CompareOp) -> PyResult<bool> {
+        match op {
+            CompareOp::Eq => Ok(self.inner == other.inner),
+            CompareOp::Ne => Ok(self.inner != other.inner),
+            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                "Operation not implemented",
+            )),
         }
+    }
+}
+
+impl Display for PySymbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.inner)
     }
 }

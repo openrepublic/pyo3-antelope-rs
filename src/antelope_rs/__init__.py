@@ -13,28 +13,27 @@
 
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from .abi import (
-    ABILike as ABILike,
-    ABIView as ABIView
+from typing import (
+    Any,
+    Type,
 )
 
-from .builtins import (
-    builtin_classes as builtin_classes,
-    builtin_class_map as builtin_class_map,
-
-    NameLike as NameLike,
-    Sum160Like as Sum160Like,
-    Sum256Like as Sum256Like,
-    Sum512Like as Sum512Like,
-    PrivKeyLike as PrivKeyLike,
-    PubKeyLike as PubKeyLike,
-    SigLike as SigLike,
-    SymCodeLike as SymCodeLike,
-    SymLike as SymLike,
-    AssetLike as AssetLike,
-    ExtAssetLike as ExtAssetLike,
-
-    IOTypes as IOTypes
+from .abi import (
+    Int64Bytes as Int64Bytes,
+    AntelopeNameStr as AntelopeNameStr,
+    AssetBytes as AssetBytes,
+    ExtAssetBytes as ExtAssetBytes,
+    NameBytes as NameBytes,
+    Sum160Bytes as Sum160Bytes,
+    Sum160Str as Sum160Str,
+    Sum256Bytes as Sum256Bytes,
+    Sum256Str as Sum512Bytes,
+    Sum512Bytes as Sum256Str,
+    Sum512Str as Sum512Str,
+    SymCodeBytes as SymCodeBytes,
+    SymbolBytes as SymbolBytes,
+    ABILike as ABILike,
+    ABIView as ABIView
 )
 
 from ._lowlevel import (
@@ -60,3 +59,51 @@ from ._lowlevel import (
 
     sign_tx as sign_tx
 )
+
+builtin_classes: tuple[Type[Any], ...] = (
+    Name,
+    Checksum160,
+    Checksum256,
+    Checksum512,
+    PrivateKey,
+    PublicKey,
+    Signature,
+    Asset,
+    ExtendedAsset,
+    SymbolCode,
+    Symbol,
+    ABI,
+    ShipABI
+)
+
+# typing hints for each builtin class supporting try_from
+NameLike = NameBytes | int | AntelopeNameStr | Name
+Sum160Like = Sum160Bytes | Sum160Str | Checksum160
+Sum256Like = Sum256Bytes | Sum256Str | Checksum256
+Sum512Like = Sum512Bytes | Sum512Str | Checksum512
+PrivKeyLike = bytes | str | PrivateKey
+PubKeyLike = bytes | str | PublicKey
+SigLike = bytes | str | Signature
+SymCodeLike = SymCodeBytes | int | str | SymbolCode
+SymLike = SymbolBytes | int | str | Symbol
+AssetLike = AssetBytes | str | Asset
+ExtAssetLike = ExtAssetBytes | str | ExtendedAsset
+
+IOTypes = (
+    None | bool | int | float | bytes | str | list | dict
+)
+
+
+# map std names to builtin_classes
+builtin_class_map: dict[str, Type[Any]] = {
+    'name': Name,
+    'checksum160': Checksum160,
+    'checksum256': Checksum256,
+    'checksum512': Checksum512,
+    'public_key': PublicKey,
+    'signature': Signature,
+    'symbol': Symbol,
+    'symbol_code': SymbolCode,
+    'asset': Asset,
+    'extended_asset': ExtendedAsset,
+}

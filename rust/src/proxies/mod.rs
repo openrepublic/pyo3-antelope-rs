@@ -7,3 +7,4 @@ pub mod public_key;
 pub mod signature;
 pub mod sym;
 pub mod sym_code;
+pub mod time;

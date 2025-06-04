@@ -2,7 +2,9 @@ use std::str::FromStr;
 
 use antelope::{
     chain::{
-        abi::{ABIResolveError, ABIResolvedType, ABITypeResolver, ABIView, AbiVariant, TypeModifier},
+        abi::{
+            ABIResolveError, ABIResolvedType, ABITypeResolver, ABIView, AbiVariant, TypeModifier,
+        },
         asset::{Asset, ExtendedAsset, Symbol, SymbolCode},
         checksum::{Checksum160, Checksum256, Checksum512},
         key_type::KeyType,
@@ -22,16 +24,15 @@ use pyo3::{
 use thiserror::Error;
 
 use crate::proxies::{
-    asset::{Asset as PyAsset, ExtendedAsset as PyExtendedAsset},
+    asset::{PyAsset, PyExtendedAsset},
     checksums::{
-        Checksum160 as PyChecksum160, Checksum256 as PyChecksum256,
-        Checksum512 as PyChecksum512,
+        PyChecksum160, PyChecksum256, PyChecksum512,
     },
-    name::Name as PyName,
-    public_key::PublicKey as PyPublicKey,
-    signature::Signature as PySignature,
-    sym::Symbol as PySymbol,
-    sym_code::SymbolCode as PySymbolCode,
+    name::PyName,
+    public_key::PyPublicKey,
+    signature::PySignature,
+    sym::PySymbol,
+    sym_code::PySymbolCode,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -135,7 +136,7 @@ fn encode_with_meta<'py, ABI>(
 where
     ABI: ABIView + ABITypeResolver,
 {
-    if let Some(_) = meta.modifiers.first() {
+    if !meta.modifiers.is_empty() {
         let this_mod = meta.modifiers.remove(0);
 
         match this_mod {
@@ -151,12 +152,12 @@ where
             }
 
             TypeModifier::Array => {
-                let seq = value.downcast::<PyList>().map_err(|_| {
-                    EncodeError::TypeMismatch {
+                let seq = value
+                    .downcast::<PyList>()
+                    .map_err(|_| EncodeError::TypeMismatch {
                         path: path.as_str(),
                         expected: "list/tuple".into(),
-                    }
-                })?;
+                    })?;
 
                 let len = seq.len() as u32;
                 let mut size = VarUint32::new(len).pack(encoder);
@@ -186,12 +187,11 @@ where
     }
 
     if let Some(var_meta) = &meta.is_variant {
-        let (idx, sel_ty) =
-            detect_variant(path, abi, var_meta, value)?;
+        let (idx, sel_ty) = detect_variant(path, abi, var_meta, value)?;
 
         let mut size = VarUint32::new(idx as u32).pack(encoder);
 
-        path.push(format!("variant({})", idx));
+        path.push(format!("variant({idx})"));
         size += encode_abi_type(abi, &sel_ty, value, encoder)?;
         path.pop();
 
@@ -199,10 +199,12 @@ where
     }
 
     if let Some(struct_def) = &meta.is_struct {
-        let dict = value.downcast::<PyDict>().map_err(|_| EncodeError::TypeMismatch {
-            path: path.as_str(),
-            expected: "dict".into(),
-        })?;
+        let dict = value
+            .downcast::<PyDict>()
+            .map_err(|_| EncodeError::TypeMismatch {
+                path: path.as_str(),
+                expected: "dict".into(),
+            })?;
 
         let mut size = 0usize;
 
@@ -251,11 +253,13 @@ fn encode_std<'py>(
 ) -> PyResult<usize> {
     macro_rules! extract {
         ($t:ty) => {
-            value.extract::<$t>().map_err(|_| EncodeError::ExtractError {
-                type_name: meta.resolved_name.clone(),
-                value: value.to_string(),
-                path: path.as_str(),
-            })
+            value
+                .extract::<$t>()
+                .map_err(|_| EncodeError::ExtractError {
+                    type_name: meta.resolved_name.clone(),
+                    value: value.to_string(),
+                    path: path.as_str(),
+                })
         };
     }
 
@@ -392,7 +396,7 @@ fn encode_std<'py>(
             let sum = if let Ok(raw) = value.extract::<[u8; 20]>() {
                 Ok(Checksum160::from(raw))
             } else if let Ok(hex) = extract!(String) {
-                Checksum160::from_hex(&hex).map_err(|e| EncodeError::Parse {
+                Checksum160::from_str(&hex).map_err(|e| EncodeError::Parse {
                     type_name: meta.resolved_name.clone(),
                     value: hex,
                     path: path.as_str(),
@@ -412,7 +416,7 @@ fn encode_std<'py>(
             let sum = if let Ok(raw) = value.extract::<[u8; 32]>() {
                 Ok(Checksum256::from(raw))
             } else if let Ok(hex) = extract!(String) {
-                Checksum256::from_hex(&hex).map_err(|e| EncodeError::Parse {
+                Checksum256::from_str(&hex).map_err(|e| EncodeError::Parse {
                     type_name: meta.resolved_name.clone(),
                     value: hex,
                     path: path.as_str(),
@@ -432,7 +436,7 @@ fn encode_std<'py>(
             let sum = if let Ok(raw) = value.extract::<[u8; 64]>() {
                 Ok(Checksum512::from(raw))
             } else if let Ok(hex) = extract!(String) {
-                Checksum512::from_hex(&hex).map_err(|e| EncodeError::Parse {
+                Checksum512::from_str(&hex).map_err(|e| EncodeError::Parse {
                     type_name: meta.resolved_name.clone(),
                     value: hex,
                     path: path.as_str(),
@@ -450,8 +454,9 @@ fn encode_std<'py>(
         }
         "public_key" => {
             let key = if let Ok((raw, kt)) = value.extract::<(Vec<u8>, u8)>() {
-                let ktype = KeyType::try_from(kt).map_err(|e| PyValueError::new_err(e.to_string()))?;
-                Ok(PublicKey::from_bytes(raw, ktype))
+                let ktype =
+                    KeyType::try_from(kt).map_err(|e| PyValueError::new_err(e.to_string()))?;
+                Ok(PublicKey::from((raw, ktype)))
             } else if let Ok(raw) = value.extract::<Vec<u8>>() {
                 let mut k = PublicKey::default();
                 k.unpack(&raw).map_err(|e| EncodeError::UnpackError {
@@ -601,10 +606,7 @@ fn encode_std<'py>(
                     err: e.to_string(),
                 })
             } else if let Ok(py) = value.extract::<PyExtendedAsset>() {
-                Ok(ExtendedAsset {
-                    quantity: py.quantity.inner,
-                    contract: py.contract.inner,
-                })
+                Ok(py.into())
             } else {
                 Err(EncodeError::TypeMismatch {
                     path: path.as_str(),
@@ -635,7 +637,8 @@ fn detect_variant<'py>(
             expected: "string".into(),
         })?;
 
-        let idx = var_meta.types
+        let idx = var_meta
+            .types
             .iter()
             .position(|t| **t == tag)
             .ok_or_else(|| EncodeError::UnknownType {
@@ -653,17 +656,19 @@ fn detect_variant<'py>(
     // std type variant
     let mut candidate = None;
     for (idx, ty) in var_meta.types.iter().enumerate() {
-        let meta = abi.resolve_type(ty)
-            .map_err(|e| EncodeError::Resolve {
-                path: ty.to_string(),
-                source: e,
-            })?;
-        if !meta.is_std { continue; }  // we only auto-detect std types
+        let meta = abi.resolve_type(ty).map_err(|e| EncodeError::Resolve {
+            path: ty.to_string(),
+            source: e,
+        })?;
+        if !meta.is_std {
+            continue;
+        } // we only auto-detect std types
 
         if candidate.is_some() {
-            return Err(PyValueError::new_err(
-                format!("Ambiguous ABI variant detected {}", var_meta.name)
-            ));
+            return Err(PyValueError::new_err(format!(
+                "Ambiguous ABI variant detected {}",
+                var_meta.name
+            )));
         }
         candidate = Some((idx, ty.clone()));
     }
@@ -672,7 +677,8 @@ fn detect_variant<'py>(
         return Ok((idx, ty));
     }
 
-    Err(PyTypeError::new_err(
-        format!("Could not detect variant type: {}", var_meta.name)
-    ))
+    Err(PyTypeError::new_err(format!(
+        "Could not detect variant type: {}",
+        var_meta.name
+    )))
 }

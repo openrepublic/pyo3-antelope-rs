@@ -20,13 +20,15 @@ use pyo3::{
 use thiserror::Error;
 
 use crate::proxies::{
-    asset::{Asset as PyAsset, ExtendedAsset as PyExtendedAsset},
-    checksums::{Checksum160 as PyChecksum160, Checksum256 as PyChecksum256, Checksum512 as PyChecksum512},
-    name::Name as PyName,
-    public_key::PublicKey as PyPublicKey,
-    signature::Signature as PySignature,
-    sym::Symbol as PySymbol,
-    sym_code::SymbolCode as PySymbolCode,
+    asset::{PyAsset, PyExtendedAsset},
+    checksums::{
+        PyChecksum160, PyChecksum256, PyChecksum512,
+    },
+    name::PyName,
+    public_key::PyPublicKey,
+    signature::PySignature,
+    sym::PySymbol,
+    sym_code::PySymbolCode,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -105,18 +107,16 @@ fn decode_with_meta<'py, ABI>(
 where
     ABI: ABIView + ABITypeResolver,
 {
-    if let Some(_) = meta.modifiers.first() {
+    if !meta.modifiers.is_empty() {
         let this_mod = meta.modifiers.remove(0);
         match this_mod {
             TypeModifier::Optional => {
                 let mut flag: u8 = 0;
-                decoder
-                    .unpack(&mut flag)
-                    .map_err(|e| DecodeError::Unpack {
-                        what: "optional-flag".into(),
-                        path: path.as_str(),
-                        err: e.to_string(),
-                    })?;
+                decoder.unpack(&mut flag).map_err(|e| DecodeError::Unpack {
+                    what: "optional-flag".into(),
+                    path: path.as_str(),
+                    err: e.to_string(),
+                })?;
 
                 if flag == 0 {
                     return Ok(py.None().into_bound(py));
@@ -173,12 +173,13 @@ where
             })?;
         let idx = idx_vu.value() as usize;
 
-        let inner_type_name = var_meta.types.get(idx).ok_or_else(|| {
-            DecodeError::UnknownType {
+        let inner_type_name = var_meta
+            .types
+            .get(idx)
+            .ok_or_else(|| DecodeError::UnknownType {
                 name: format!("variant-idx {idx}"),
                 path: path.as_str(),
-            }
-        })?;
+            })?;
 
         path.push(format!("variant({idx})"));
         let payload = decode_abi_type(py, abi, inner_type_name, decoder)?;
@@ -192,7 +193,7 @@ where
     }
 
     if let Some(struct_def) = &meta.is_struct {
-        let dict = if struct_def.base.len() > 0 {
+        let dict = if !struct_def.base.is_empty() {
             let val = decode_abi_type(py, abi, &struct_def.base, decoder)?;
             val.downcast()?.to_owned()
         } else {
@@ -223,13 +224,11 @@ fn decode_std<'py>(
     macro_rules! unpack_prim {
         ($t:ty) => {{
             let mut tmp: $t = Default::default();
-            decoder
-                .unpack(&mut tmp)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut tmp).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             tmp.into_bound_py_any(py)
         }};
     }
@@ -248,170 +247,142 @@ fn decode_std<'py>(
         "int128" => unpack_prim!(i128),
         "varuint32" => {
             let mut vu: VarUint32 = VarUint32::default();
-            decoder
-                .unpack(&mut vu)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut vu).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             vu.value().into_bound_py_any(py)
         }
-        "varint32" => Err(PyNotImplementedError::new_err("varint32 decoding not implemented")),
+        "varint32" => Err(PyNotImplementedError::new_err(
+            "varint32 decoding not implemented",
+        )),
         "float32" => unpack_prim!(f32),
         "float64" => unpack_prim!(f64),
         "float128" => {
             let mut f: Float128 = Default::default();
-            decoder
-                .unpack(&mut f)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut f).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             PyBytes::new(py, &f.data).into_bound_py_any(py)
         }
         "time_point" => {
             let mut tp: TimePoint = Default::default();
-            decoder
-                .unpack(&mut tp)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut tp).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             tp.elapsed.into_bound_py_any(py)
         }
         "time_point_sec" => {
             let mut tp: TimePointSec = Default::default();
-            decoder
-                .unpack(&mut tp)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut tp).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             tp.seconds.into_bound_py_any(py)
         }
         "block_timestamp_type" => {
             let mut bt: BlockTimestamp = Default::default();
-            decoder
-                .unpack(&mut bt)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut bt).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             bt.slot.into_bound_py_any(py)
         }
         "name" => {
             let mut n: Name = Default::default();
-            decoder
-                .unpack(&mut n)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut n).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             PyName { inner: n }.into_bound_py_any(py)
         }
         "bytes" => {
             let mut v: Vec<u8> = Vec::new();
-            decoder
-                .unpack(&mut v)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut v).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             PyBytes::new(py, v.as_slice()).into_bound_py_any(py)
         }
         "string" => {
             let mut s: String = String::new();
-            decoder
-                .unpack(&mut s)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut s).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             s.into_bound_py_any(py)
         }
         "checksum160" => {
             let mut sum: Checksum160 = Default::default();
-            decoder
-                .unpack(&mut sum)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut sum).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             PyChecksum160 { inner: sum }.into_bound_py_any(py)
         }
         "checksum256" => {
             let mut sum: Checksum256 = Default::default();
-            decoder
-                .unpack(&mut sum)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut sum).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             PyChecksum256 { inner: sum }.into_bound_py_any(py)
         }
         "checksum512" => {
             let mut sum: Checksum512 = Default::default();
-            decoder
-                .unpack(&mut sum)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut sum).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             PyChecksum512 { inner: sum }.into_bound_py_any(py)
         }
         "public_key" => {
             let mut pk: PublicKey = Default::default();
-            decoder
-                .unpack(&mut pk)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut pk).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             PyPublicKey { inner: pk }.into_bound_py_any(py)
         }
         "signature" => {
             let mut sig: Signature = Default::default();
-            decoder
-                .unpack(&mut sig)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut sig).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             PySignature { inner: sig }.into_bound_py_any(py)
         }
         "symbol" => {
             let mut sym: Symbol = Default::default();
-            decoder
-                .unpack(&mut sym)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut sym).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             PySymbol { inner: sym }.into_bound_py_any(py)
         }
         "symbol_code" => {
             let mut sc: SymbolCode = Default::default();
-            decoder
-                .unpack(&mut sc)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
+            decoder.unpack(&mut sc).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
             PySymbolCode { inner: sc }.into_bound_py_any(py)
         }
         "asset" => {
@@ -427,18 +398,13 @@ fn decode_std<'py>(
         }
         "extended_asset" => {
             let mut ext: ExtendedAsset = Default::default();
-            decoder
-                .unpack(&mut ext)
-                .map_err(|e| DecodeError::Unpack {
-                    what: meta.resolved_name.clone(),
-                    path: path.as_str(),
-                    err: e.to_string(),
-                })?;
-            PyExtendedAsset {
-                quantity: PyAsset { inner: ext.quantity },
-                contract: PyName { inner: ext.contract },
-            }
-            .into_bound_py_any(py)
+            decoder.unpack(&mut ext).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
+
+            PyExtendedAsset::from(ext).into_bound_py_any(py)
         }
         _ => Err(DecodeError::UnknownStdType {
             name: meta.resolved_name.clone(),
