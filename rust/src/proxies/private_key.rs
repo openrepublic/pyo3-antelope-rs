@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::str::FromStr;
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Debug, Clone)]
 pub struct PrivateKey {
     pub inner: NativePrivateKey,
@@ -37,10 +37,11 @@ impl From<NativePrivateKey> for PrivateKey {
 impl PrivateKey {
     #[staticmethod]
     pub fn from_bytes(raw: &[u8]) -> PyResult<Self> {
+        // Packer type decoding is not used because private_key doesn't implement the trait
         let key_type =
             KeyType::try_from(raw[0]).map_err(|e| PyValueError::new_err(e.to_string()))?;
 
-        Ok(NativePrivateKey::from_bytes(raw[1..].to_vec(), key_type).into())
+        Ok(NativePrivateKey::from((raw[1..].to_vec(), key_type)).into())
     }
 
     #[staticmethod]
@@ -100,7 +101,7 @@ impl PrivateKey {
     }
 
     fn __str__(&self) -> String {
-        self.inner.as_string()
+        self.inner.to_string()
     }
 
     fn __hash__(&self) -> u64 {

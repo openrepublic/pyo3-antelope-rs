@@ -7,14 +7,13 @@ use pyo3::prelude::*;
 use std::fmt::Display;
 use std::str::FromStr;
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Debug, Clone)]
 pub struct Symbol {
     pub inner: NativeSymbol,
 }
 
-#[pyclass]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, FromPyObject)]
 pub enum SymLike {
     Raw([u8; 8]),
     Str(String),

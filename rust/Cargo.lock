@@ -46,7 +46,7 @@ dependencies = [
 [[package]]
 name = "antelope-client"
 version = "0.4.0"
-source = "git+https://github.com/openrepublic/antelope-rs.git?rev=f9155d468aee05d21f1a7780aa730d7c05ad1b7a#f9155d468aee05d21f1a7780aa730d7c05ad1b7a"
+source = "git+https://github.com/openrepublic/antelope-rs.git?rev=bc10bc15bdb46a02428b1a19871744fc0fe4a1ff#bc10bc15bdb46a02428b1a19871744fc0fe4a1ff"
 dependencies = [
  "antelope-client-macros",
  "async-trait",
@@ -61,6 +61,7 @@ dependencies = [
  "log",
  "once_cell",
  "p256",
+ "paste",
  "phf",
  "rand",
  "reqwest",
@@ -78,7 +79,7 @@ dependencies = [
 [[package]]
 name = "antelope-client-macros"
 version = "0.2.0"
-source = "git+https://github.com/openrepublic/antelope-rs.git?rev=f9155d468aee05d21f1a7780aa730d7c05ad1b7a#f9155d468aee05d21f1a7780aa730d7c05ad1b7a"
+source = "git+https://github.com/openrepublic/antelope-rs.git?rev=bc10bc15bdb46a02428b1a19871744fc0fe4a1ff#bc10bc15bdb46a02428b1a19871744fc0fe4a1ff"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1110,6 +1111,12 @@ dependencies = [
  "smallvec",
  "windows-targets 0.52.6",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pem-rfc7468"

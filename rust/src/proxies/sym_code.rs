@@ -6,14 +6,13 @@ use pyo3::prelude::*;
 use std::fmt::Display;
 use std::str::FromStr;
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Debug, Clone)]
 pub struct SymbolCode {
     pub inner: NativeSymbolCode,
 }
 
-#[pyclass]
-#[derive(FromPyObject)]
+#[derive(Debug, Clone, FromPyObject)]
 pub enum SymCodeLike {
     Raw([u8; 8]),
     Str(String),

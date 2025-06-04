@@ -396,7 +396,7 @@ fn encode_std<'py>(
             let sum = if let Ok(raw) = value.extract::<[u8; 20]>() {
                 Ok(Checksum160::from(raw))
             } else if let Ok(hex) = extract!(String) {
-                Checksum160::from_hex(&hex).map_err(|e| EncodeError::Parse {
+                Checksum160::from_str(&hex).map_err(|e| EncodeError::Parse {
                     type_name: meta.resolved_name.clone(),
                     value: hex,
                     path: path.as_str(),
@@ -416,7 +416,7 @@ fn encode_std<'py>(
             let sum = if let Ok(raw) = value.extract::<[u8; 32]>() {
                 Ok(Checksum256::from(raw))
             } else if let Ok(hex) = extract!(String) {
-                Checksum256::from_hex(&hex).map_err(|e| EncodeError::Parse {
+                Checksum256::from_str(&hex).map_err(|e| EncodeError::Parse {
                     type_name: meta.resolved_name.clone(),
                     value: hex,
                     path: path.as_str(),
@@ -436,7 +436,7 @@ fn encode_std<'py>(
             let sum = if let Ok(raw) = value.extract::<[u8; 64]>() {
                 Ok(Checksum512::from(raw))
             } else if let Ok(hex) = extract!(String) {
-                Checksum512::from_hex(&hex).map_err(|e| EncodeError::Parse {
+                Checksum512::from_str(&hex).map_err(|e| EncodeError::Parse {
                     type_name: meta.resolved_name.clone(),
                     value: hex,
                     path: path.as_str(),
@@ -456,7 +456,7 @@ fn encode_std<'py>(
             let key = if let Ok((raw, kt)) = value.extract::<(Vec<u8>, u8)>() {
                 let ktype =
                     KeyType::try_from(kt).map_err(|e| PyValueError::new_err(e.to_string()))?;
-                Ok(PublicKey::from_bytes(raw, ktype))
+                Ok(PublicKey::from((raw, ktype)))
             } else if let Ok(raw) = value.extract::<Vec<u8>>() {
                 let mut k = PublicKey::default();
                 k.unpack(&raw).map_err(|e| EncodeError::UnpackError {

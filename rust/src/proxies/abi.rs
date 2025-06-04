@@ -35,7 +35,7 @@ fn abi_variant_as_dict<'py>(py: Python<'py>, v: &AbiVariant) -> PyResult<Bound<'
 
 macro_rules! define_pyabi {
     ($wrapper:ident, $inner:path) => {
-        #[pyclass]
+        #[pyclass(frozen)]
         #[derive(Debug, Clone)]
         pub struct $wrapper {
             pub inner: $inner,

@@ -7,7 +7,7 @@ use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Name {
     pub inner: NativeName,

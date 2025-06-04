@@ -5,7 +5,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::str::FromStr;
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Debug, Clone)]
 pub struct Signature {
     pub inner: NativeSig,
@@ -66,7 +66,7 @@ impl Signature {
     }
 
     fn __str__(&self) -> String {
-        self.inner.as_string()
+        self.inner.to_string()
     }
 
     fn __richcmp__(&self, other: &Signature, op: CompareOp) -> PyResult<bool> {

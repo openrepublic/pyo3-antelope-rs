@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::str::FromStr;
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Debug, Clone)]
 pub struct PublicKey {
     pub inner: NativePublicKey,
@@ -82,7 +82,7 @@ impl PublicKey {
     }
 
     fn __str__(&self) -> String {
-        self.inner.as_string()
+        self.inner.to_string()
     }
 
     fn __hash__(&self) -> u64 {

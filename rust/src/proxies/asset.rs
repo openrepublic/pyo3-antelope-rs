@@ -13,7 +13,7 @@ use crate::proxies::{
     sym::{SymLike, Symbol},
 };
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Debug, Clone)]
 pub struct Asset {
     pub inner: NativeAsset,
@@ -180,7 +180,7 @@ impl Display for Asset {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Debug, Clone)]
 pub struct ExtendedAsset {
     pub inner: NativeExtAsset,

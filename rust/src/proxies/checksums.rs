@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::str::FromStr;
 
 use antelope::chain::checksum::{
     Checksum160 as NativeSum160, Checksum256 as NativeSum256, Checksum512 as NativeSum512,
@@ -7,7 +8,7 @@ use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Debug, Clone)]
 pub struct Checksum160 {
     pub inner: NativeSum160,
@@ -42,7 +43,7 @@ impl Checksum160 {
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        NativeSum160::from_hex(s)
+        NativeSum160::from_str(s)
             .map(|sum| sum.into())
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
@@ -62,7 +63,7 @@ impl Checksum160 {
     }
 
     fn __str__(&self) -> String {
-        self.inner.as_string()
+        self.inner.to_string()
     }
 
     fn __richcmp__(&self, other: PyRef<Checksum160>, op: CompareOp) -> PyResult<bool> {
@@ -82,7 +83,7 @@ impl Display for Checksum160 {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Debug, Clone)]
 pub struct Checksum256 {
     pub inner: NativeSum256,
@@ -117,7 +118,7 @@ impl Checksum256 {
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        NativeSum256::from_hex(s)
+        NativeSum256::from_str(s)
             .map(|sum| sum.into())
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
@@ -137,7 +138,7 @@ impl Checksum256 {
     }
 
     fn __str__(&self) -> String {
-        self.inner.as_string()
+        self.inner.to_string()
     }
 
     fn __richcmp__(&self, other: PyRef<Checksum256>, op: CompareOp) -> PyResult<bool> {
@@ -157,7 +158,7 @@ impl Display for Checksum256 {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Debug, Clone)]
 pub struct Checksum512 {
     pub inner: NativeSum512,
@@ -192,7 +193,7 @@ impl Checksum512 {
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        NativeSum512::from_hex(s)
+        NativeSum512::from_str(s)
             .map(|sum| sum.into())
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
@@ -212,7 +213,7 @@ impl Checksum512 {
     }
 
     fn __str__(&self) -> String {
-        self.inner.as_string()
+        self.inner.to_string()
     }
 
     fn __richcmp__(&self, other: PyRef<Checksum512>, op: CompareOp) -> PyResult<bool> {
