@@ -1,6 +1,5 @@
-use antelope::chain::key_type::KeyType;
 use antelope::chain::signature::Signature as NativeSig;
-use antelope::serializer::{Encoder, Packer};
+use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -12,23 +11,53 @@ pub struct Signature {
     pub inner: NativeSig,
 }
 
+#[derive(FromPyObject)]
+pub enum SigLike {
+    Raw(Vec<u8>),
+    Str(String),
+    Cls(Signature)
+}
+
+impl From<Signature> for NativeSig {
+    fn from(value: Signature) -> Self {
+        value.inner
+    }
+}
+
+impl From<NativeSig> for Signature {
+    fn from(value: NativeSig) -> Self {
+        Signature { inner: value }
+    }
+}
+
 #[pymethods]
 impl Signature {
     #[staticmethod]
-    fn from_str(s: &str) -> PyResult<Self> {
-        Ok(Signature {
-            inner: NativeSig::from_str(s).map_err(|e| PyValueError::new_err(e))?,
-        })
+    pub fn from_bytes(
+        buffer: &[u8]
+    ) -> PyResult<Self> {
+        let mut decoder = Decoder::new(buffer);
+        let mut inner: NativeSig = Default::default();
+        decoder.unpack(&mut inner)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(inner.into())
     }
 
     #[staticmethod]
-    fn from_bytes(raw: &[u8]) -> PyResult<Self> {
-        let key_type =
-            KeyType::try_from(raw[0]).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    #[pyo3(name = "from_str")]
+    pub fn from_str_py(s: &str) -> PyResult<Self> {
+        NativeSig::from_str(s)
+            .map(|s| s.into())
+            .map_err(PyValueError::new_err)
+    }
 
-        Ok(Signature {
-            inner: NativeSig::from_bytes(raw.to_vec(), key_type), // .map_err(|e| PyValueError::new_err(e))?,
-        })
+    #[staticmethod]
+    pub fn try_from(value: SigLike) -> PyResult<Signature> {
+        match value {
+            SigLike::Raw(data) => Signature::from_bytes(&data),
+            SigLike::Str(s) => Signature::from_str_py(&s),
+            SigLike::Cls(key) => Ok(key)
+        }
     }
 
     pub fn encode(&self) -> Vec<u8> {

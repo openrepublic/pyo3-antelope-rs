@@ -135,7 +135,7 @@ fn encode_with_meta<'py, ABI>(
 where
     ABI: ABIView + ABITypeResolver,
 {
-    if let Some(_) = meta.modifiers.first() {
+    if !meta.modifiers.is_empty() {
         let this_mod = meta.modifiers.remove(0);
 
         match this_mod {
@@ -191,7 +191,7 @@ where
 
         let mut size = VarUint32::new(idx as u32).pack(encoder);
 
-        path.push(format!("variant({})", idx));
+        path.push(format!("variant({idx})"));
         size += encode_abi_type(abi, &sel_ty, value, encoder)?;
         path.pop();
 
@@ -601,10 +601,7 @@ fn encode_std<'py>(
                     err: e.to_string(),
                 })
             } else if let Ok(py) = value.extract::<PyExtendedAsset>() {
-                Ok(ExtendedAsset {
-                    quantity: py.quantity.inner,
-                    contract: py.contract.inner,
-                })
+                Ok(py.into())
             } else {
                 Err(EncodeError::TypeMismatch {
                     path: path.as_str(),

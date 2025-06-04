@@ -2,18 +2,15 @@ pub mod serializer;
 pub mod proxies;
 pub mod types;
 
-mod utils;
-
 use antelope::chain::action::Action;
-use antelope::chain::time::TimePointSec;
-use antelope::chain::transaction::{CompressionType, PackedTransaction, SignedTransaction, Transaction, TransactionHeader};
-use antelope::chain::varint::VarUint32;
+use antelope::chain::transaction::{CompressionType, PackedTransaction, SignedTransaction, Transaction};
 use antelope::chain::abi::BUILTIN_TYPES;
 use antelope::util::bytes_to_hex;
 use pyo3::exceptions::PyValueError;
 use pyo3::panic::PanicException;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFrozenSet, PyInt};
+use types::PyTransactionHeader;
 use crate::proxies::{
     name::Name,
     sym_code::SymbolCode,
@@ -31,22 +28,10 @@ use crate::types::PyAction;
 #[pyfunction]
 fn sign_tx(
     chain_id: Vec<u8>,
+    header: PyTransactionHeader,
     actions: Vec<PyAction>,
     sign_key: &PrivateKey,
-    expiration: u32,
-    max_cpu_usage_ms: u8,
-    max_net_usage_words: u32,
-    ref_block_num: u16,
-    ref_block_prefix: u32
 ) -> PyResult<Py<PyDict>> {
-    let header = TransactionHeader {
-        expiration: TimePointSec::new(expiration),
-        ref_block_num,
-        ref_block_prefix,
-        max_net_usage_words: VarUint32::new(max_net_usage_words),
-        max_cpu_usage_ms,
-        delay_sec: VarUint32::new(0),
-    };
 
     let mut _actions: Vec<Action> = Vec::with_capacity(actions.len());
     for action in actions.iter() {
@@ -57,7 +42,7 @@ fn sign_tx(
 
     // put together transaction to sign
     let transaction = Transaction {
-        header,
+        header: header.into(),
         context_free_actions: vec![],
         actions,
         extension: vec![],
@@ -75,7 +60,8 @@ fn sign_tx(
     };
 
     // finally PackedTransaction is the payload to be broadcasted
-    let tx = PackedTransaction::from_signed(signed_tx, CompressionType::NONE).unwrap();
+    let tx = PackedTransaction::from_signed(signed_tx, CompressionType::NONE)
+        .map_err(|e| PyValueError::new_err(format!("Error signing packed trx: {e}")))?;
 
     // pack and return into a bounded PyDict
     Python::with_gil(|py| {

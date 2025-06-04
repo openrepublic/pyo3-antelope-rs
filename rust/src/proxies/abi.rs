@@ -56,7 +56,8 @@ macro_rules! define_pyabi {
             }
 
             #[staticmethod]
-            pub fn from_str(s: &str) -> PyResult<Self> {
+            #[pyo3(name = "from_str")]
+            pub fn from_str_py(s: &str) -> PyResult<Self> {
                 let inner =
                     <$inner>::from_string(s).map_err(|e| PyValueError::new_err(e.to_string()))?;
                 Ok(Self { inner })

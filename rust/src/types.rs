@@ -1,43 +1,11 @@
 use antelope::chain::action::{Action, PermissionLevel};
 use antelope::chain::name::Name as NativeName;
+use antelope::chain::time::TimePointSec;
+use antelope::chain::transaction::TransactionHeader;
+use antelope::chain::varint::VarUint32;
 use pyo3::{FromPyObject, PyResult};
 use pyo3::exceptions::PyValueError;
 use std::str::FromStr;
-
-#[macro_export]
-macro_rules! impl_packable_py {
-    (
-        impl $wrapper:ident ( $inner:ty ) {
-            $($rest:tt)*
-        }
-    ) => {
-        #[pymethods]
-        impl $wrapper {
-            // build an instance from raw bytes.
-            #[staticmethod]
-            pub fn from_bytes(
-                buffer: &[u8]
-            ) -> ::pyo3::PyResult<Self>
-            {
-                let mut decoder = ::antelope::serializer::Decoder::new(buffer);
-                let mut inner: $inner =
-                    ::core::default::Default::default();
-                decoder.unpack(&mut inner)
-                    .map_err(|e| ::pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-                Ok(Self { inner })
-            }
-
-            // encode the wrapped value back into bytes.
-            pub fn encode(&self) -> ::std::vec::Vec<u8> {
-                let mut encoder = ::antelope::serializer::Encoder::new(0);
-                self.inner.pack(&mut encoder);
-                encoder.get_bytes().to_vec()
-            }
-
-            $($rest)*
-        }
-    };
-}
 
 #[derive(FromPyObject)]
 pub(crate) struct PyPermissionLevel {
@@ -75,5 +43,28 @@ impl From<&PyAction> for PyResult<Action> {
             authorization: auths,
             data: py_action.data.clone(),
         })
+    }
+}
+
+#[derive(FromPyObject)]
+pub(crate) struct PyTransactionHeader {
+    pub expiration: u32,
+    pub ref_block_num: u16,
+    pub ref_block_prefix: u32,
+    pub max_net_usage_words: u32,
+    pub max_cpu_usage_ms: u8,
+    pub delay_sec: u32,
+}
+
+impl From<PyTransactionHeader> for TransactionHeader {
+    fn from(value: PyTransactionHeader) -> Self {
+        TransactionHeader {
+            expiration: TimePointSec::new(value.expiration),
+            ref_block_num: value.ref_block_num,
+            ref_block_prefix: value.ref_block_prefix,
+            max_net_usage_words: VarUint32::new(value.max_net_usage_words),
+            max_cpu_usage_ms: value.max_cpu_usage_ms,
+            delay_sec: VarUint32::new(value.delay_sec)
+        }
     }
 }

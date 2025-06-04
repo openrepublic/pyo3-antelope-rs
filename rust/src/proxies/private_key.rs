@@ -14,33 +14,59 @@ pub struct PrivateKey {
     pub inner: NativePrivateKey,
 }
 
+#[derive(FromPyObject)]
+pub enum PrivKeyLike {
+    Raw(Vec<u8>),
+    Str(String),
+    Cls(PrivateKey)
+}
+
+impl From<PrivateKey> for NativePrivateKey {
+    fn from(value: PrivateKey) -> Self {
+        value.inner
+    }
+}
+
+impl From<NativePrivateKey> for PrivateKey {
+    fn from(value: NativePrivateKey) -> Self {
+        PrivateKey { inner: value }
+    }
+}
+
 #[pymethods]
 impl PrivateKey {
     #[staticmethod]
-    fn from_str(s: &str) -> PyResult<Self> {
-        Ok(PrivateKey {
-            inner: NativePrivateKey::from_str(s)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
-        })
-    }
-
-    #[staticmethod]
-    fn from_bytes(raw: &[u8]) -> PyResult<Self> {
+    pub fn from_bytes(raw: &[u8]) -> PyResult<Self> {
         let key_type =
             KeyType::try_from(raw[0]).map_err(|e| PyValueError::new_err(e.to_string()))?;
 
-        Ok(PrivateKey {
-            inner: NativePrivateKey::from_bytes(raw[1..].to_vec(), key_type),
-        })
+        Ok(NativePrivateKey::from_bytes(raw[1..].to_vec(), key_type).into())
+    }
+
+    #[staticmethod]
+    #[pyo3(name = "from_str")]
+    pub fn from_str_py(s: &str) -> PyResult<Self> {
+        NativePrivateKey::from_str(s)
+            .map(|k| k.into())
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    #[staticmethod]
+    pub fn try_from(value: PrivKeyLike) -> PyResult<PrivateKey> {
+        match value {
+            PrivKeyLike::Raw(data) => PrivateKey::from_bytes(&data),
+            PrivKeyLike::Str(s) => PrivateKey::from_str_py(&s),
+            PrivKeyLike::Cls(key) => Ok(key)
+        }
     }
 
     #[staticmethod]
     pub fn random(key_type: u8) -> PyResult<Self> {
         let key_type = KeyType::try_from(key_type)
-            .map_err(|e| PyValueError::new_err(format!("Invalid key type format {}", e)))?;
+            .map_err(|e| PyValueError::new_err(format!("Invalid key type format {e}")))?;
 
         let inner = NativePrivateKey::random(key_type)
-            .map_err(|e| PyValueError::new_err(format!("Invalid key format {}", e)))?;
+            .map_err(|e| PyValueError::new_err(format!("Invalid key format {e}")))?;
 
         Ok(PrivateKey { inner })
     }
@@ -62,6 +88,11 @@ impl PrivateKey {
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         sig.pack(&mut encoder);
         Ok(encoder.get_bytes().to_vec())
+    }
+
+    #[getter]
+    pub fn raw(&self) -> &[u8] {
+        &self.inner.value
     }
 
     fn __str__(&self) -> String {

@@ -105,7 +105,7 @@ fn decode_with_meta<'py, ABI>(
 where
     ABI: ABIView + ABITypeResolver,
 {
-    if let Some(_) = meta.modifiers.first() {
+    if !meta.modifiers.is_empty() {
         let this_mod = meta.modifiers.remove(0);
         match this_mod {
             TypeModifier::Optional => {
@@ -192,7 +192,7 @@ where
     }
 
     if let Some(struct_def) = &meta.is_struct {
-        let dict = if struct_def.base.len() > 0 {
+        let dict = if !struct_def.base.is_empty() {
             let val = decode_abi_type(py, abi, &struct_def.base, decoder)?;
             val.downcast()?.to_owned()
         } else {
@@ -434,11 +434,9 @@ fn decode_std<'py>(
                     path: path.as_str(),
                     err: e.to_string(),
                 })?;
-            PyExtendedAsset {
-                quantity: PyAsset { inner: ext.quantity },
-                contract: PyName { inner: ext.contract },
-            }
-            .into_bound_py_any(py)
+
+            PyExtendedAsset::from(ext)
+                .into_bound_py_any(py)
         }
         _ => Err(DecodeError::UnknownStdType {
             name: meta.resolved_name.clone(),

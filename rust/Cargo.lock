@@ -46,7 +46,7 @@ dependencies = [
 [[package]]
 name = "antelope-client"
 version = "0.4.0"
-source = "git+https://github.com/openrepublic/antelope-rs.git?rev=f93dbbdd742bc0116a54e394e63b2fd651de4519#f93dbbdd742bc0116a54e394e63b2fd651de4519"
+source = "git+https://github.com/openrepublic/antelope-rs.git?rev=f9155d468aee05d21f1a7780aa730d7c05ad1b7a#f9155d468aee05d21f1a7780aa730d7c05ad1b7a"
 dependencies = [
  "antelope-client-macros",
  "async-trait",
@@ -78,7 +78,7 @@ dependencies = [
 [[package]]
 name = "antelope-client-macros"
 version = "0.2.0"
-source = "git+https://github.com/openrepublic/antelope-rs.git?rev=f93dbbdd742bc0116a54e394e63b2fd651de4519#f93dbbdd742bc0116a54e394e63b2fd651de4519"
+source = "git+https://github.com/openrepublic/antelope-rs.git?rev=f9155d468aee05d21f1a7780aa730d7c05ad1b7a#f9155d468aee05d21f1a7780aa730d7c05ad1b7a"
 dependencies = [
  "proc-macro2",
  "quote",

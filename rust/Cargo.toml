@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.25.0", features = ["extension-module", "abi3-py39", "rust_decimal"]}
-antelope-client = { git = "https://github.com/openrepublic/antelope-rs.git", rev = "f93dbbdd742bc0116a54e394e63b2fd651de4519" }
+antelope-client = { git = "https://github.com/openrepublic/antelope-rs.git", rev = "f9155d468aee05d21f1a7780aa730d7c05ad1b7a" }
 # antelope-client = { path = "../../antelope-rs/crates/antelope" }
 chrono = "0.4.39"
 pyo3-log = "0.12.1"
