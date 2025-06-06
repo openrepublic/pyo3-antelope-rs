@@ -38,6 +38,11 @@ from .abi import (
 )
 
 from ._lowlevel import (
+    VarUInt32 as VarUInt32,
+    VarInt32 as VarInt32,
+
+    Float128 as Float128,
+
     Name as Name,
 
     PrivateKey as PrivateKey,
@@ -66,6 +71,9 @@ from ._lowlevel import (
 )
 
 builtin_classes: tuple[Type[Any], ...] = (
+    VarUInt32,
+    VarInt32,
+    Float128,
     Name,
     Checksum160,
     Checksum256,
@@ -85,6 +93,9 @@ builtin_classes: tuple[Type[Any], ...] = (
 )
 
 # typing hints for each builtin class supporting try_from
+VarUInt32Like = Int32Bytes | int | str | VarUInt32
+VarInt32Like = Int32Bytes | int | str | VarInt32
+Float128Like = bytes | str | float | Float128
 NameLike = NameBytes | int | AntelopeNameStr | Name
 Sum160Like = Sum160Bytes | Sum160Str | Checksum160
 Sum256Like = Sum256Bytes | Sum256Str | Checksum256
@@ -107,6 +118,9 @@ IOTypes = (
 
 # map std names to builtin_classes
 builtin_class_map: dict[str, Type[Any]] = {
+    'varuint32': VarUInt32,
+    'varint32': VarInt32,
+    'float128': Float128,
     'name': Name,
     'checksum160': Checksum160,
     'checksum256': Checksum256,

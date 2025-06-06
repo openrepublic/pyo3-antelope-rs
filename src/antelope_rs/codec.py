@@ -1,6 +1,9 @@
 from typing import Any, Type
 
 from antelope_rs import (
+    VarUInt32,
+    VarInt32,
+    Float128,
     Name,
     Checksum160,
     Checksum256,
@@ -11,14 +14,25 @@ from antelope_rs import (
     Symbol,
     Asset,
     ExtendedAsset,
+    TimePoint,
+    TimePointSec,
+    BlockTimestamp
 )
 
 def enc_hook(obj: Any) -> Any:
     match obj:
+        case Float128():
+            return str(obj)
+
         case (
+            VarUInt32() |
+            VarInt32() |
             Name() |
             SymbolCode() |
-            Symbol()
+            Symbol() |
+            TimePoint() |
+            TimePointSec() |
+            BlockTimestamp()
         ):
             return int(obj)
 

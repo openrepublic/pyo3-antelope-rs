@@ -10,7 +10,9 @@ use crate::proxies::signature::PySignature;
 use crate::proxies::{asset::{PyAsset, PyExtendedAsset}, name::PyName, sym::PySymbol, sym_code::PySymbolCode};
 use crate::sign::sign_tx;
 use antelope::chain::abi::BUILTIN_TYPES;
+use proxies::float::PyFloat128;
 use proxies::time::{PyBlockTimestamp, PyTimePoint, PyTimePointSec};
+use proxies::varint::{PyVarInt32, PyVarUInt32};
 use pyo3::panic::PanicException;
 use pyo3::prelude::*;
 use pyo3::types::{PyFrozenSet, PyInt};
@@ -32,6 +34,9 @@ fn antelope_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sign_tx, m)?)?;
 
     // proxy classes
+    m.add_class::<PyFloat128>()?;
+    m.add_class::<PyVarUInt32>()?;
+    m.add_class::<PyVarInt32>()?;
     m.add_class::<PyName>()?;
 
     m.add_class::<PyPrivateKey>()?;

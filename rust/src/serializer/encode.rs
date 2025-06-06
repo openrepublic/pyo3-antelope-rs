@@ -4,20 +4,12 @@ use antelope::{
     chain::{
         abi::{
             ABIResolveError, ABIResolvedType, ABITypeResolver, ABIView, AbiVariant, TypeModifier,
-        },
-        asset::{Asset, ExtendedAsset, Symbol, SymbolCode},
-        checksum::{Checksum160, Checksum256, Checksum512},
-        key_type::KeyType,
-        name::Name,
-        public_key::PublicKey,
-        signature::Signature,
-        time::{BlockTimestamp, TimePoint, TimePointSec},
-        varint::VarUint32,
+        }, asset::{Asset, ExtendedAsset, Symbol, SymbolCode}, checksum::{Checksum160, Checksum256, Checksum512}, float::Float128, key_type::KeyType, name::Name, public_key::PublicKey, signature::Signature, time::{BlockTimestamp, TimePoint, TimePointSec}, varint::{VarInt32, VarUint32}
     },
-    serializer::{packer::Float128, Encoder, Packer},
+    serializer::{Encoder, Packer},
 };
 use pyo3::{
-    exceptions::{PyNotImplementedError, PyTypeError, PyValueError},
+    exceptions::{PyTypeError, PyValueError},
     types::{PyAnyMethods, PyDict, PyList, PyListMethods},
     Bound, PyAny, PyErr, PyResult,
 };
@@ -159,8 +151,7 @@ where
                         expected: "list/tuple".into(),
                     })?;
 
-                let len = seq.len() as u32;
-                let mut size = VarUint32::new(len).pack(encoder);
+                let mut size = VarUint32::from(seq.len()).pack(encoder);
 
                 for (i, item) in seq.iter().enumerate() {
                     path.push(format!("[{i}]"));
@@ -189,7 +180,7 @@ where
     if let Some(var_meta) = &meta.is_variant {
         let (idx, sel_ty) = detect_variant(path, abi, var_meta, value)?;
 
-        let mut size = VarUint32::new(idx as u32).pack(encoder);
+        let mut size = VarUint32::from(idx).pack(encoder);
 
         path.push(format!("variant({idx})"));
         size += encode_abi_type(abi, &sel_ty, value, encoder)?;
@@ -287,14 +278,19 @@ fn encode_std<'py>(
         "int128" => simple!(i128),
         "varuint32" => {
             let v: u32 = extract!(u32)?;
-            Ok(VarUint32::new(v).pack(encoder))
+            Ok(VarUint32::from(v).pack(encoder))
         }
-        "varint32" => Err(PyNotImplementedError::new_err("varint32")),
+        "varint32" => {
+            let v: i32 = extract!(i32)?;
+            Ok(VarInt32::from(v).pack(encoder))
+        }
         "float32" => simple!(f32),
         "float64" => simple!(f64),
         "float128" => {
             let v: [u8; 16] = extract!([u8; 16])?;
-            Ok(Float128::new(v).pack(encoder))
+            Ok(Float128::try_from(v.as_slice())
+                .map_err(|e| PyValueError::new_err(e.to_string()))?
+                .pack(encoder))
         }
         "time_point" => {
             let tp = if let Ok(elapsed) = extract!(u64) {

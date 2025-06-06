@@ -1,18 +1,11 @@
 use antelope::{
     chain::{
-        abi::{ABIResolveError, ABIResolvedType, ABITypeResolver, ABIView, TypeModifier},
-        asset::{Asset, ExtendedAsset, Symbol, SymbolCode},
-        checksum::{Checksum160, Checksum256, Checksum512},
-        name::Name,
-        public_key::PublicKey,
-        signature::Signature,
-        time::{BlockTimestamp, TimePoint, TimePointSec},
-        varint::VarUint32,
+        abi::{ABIResolveError, ABIResolvedType, ABITypeResolver, ABIView, TypeModifier}, asset::{Asset, ExtendedAsset, Symbol, SymbolCode}, checksum::{Checksum160, Checksum256, Checksum512}, float::Float128, name::Name, public_key::PublicKey, signature::Signature, time::{BlockTimestamp, TimePoint, TimePointSec}, varint::{VarInt32, VarUint32}
     },
-    serializer::{packer::Float128, Decoder},
+    serializer::Decoder,
 };
 use pyo3::{
-    exceptions::{PyNotImplementedError, PyValueError},
+    exceptions::PyValueError,
     prelude::*,
     types::{PyBytes, PyDict, PyList},
     IntoPyObjectExt,
@@ -135,7 +128,7 @@ where
                         path: path.as_str(),
                         err: e.to_string(),
                     })?;
-                let len = len_vu.value() as usize;
+                let len: usize = len_vu.into();
 
                 let list = PyList::empty(py);
                 for i in 0..len {
@@ -171,7 +164,7 @@ where
                 path: path.as_str(),
                 err: e.to_string(),
             })?;
-        let idx = idx_vu.value() as usize;
+        let idx: usize = idx_vu.into();
 
         let inner_type_name = var_meta
             .types
@@ -252,11 +245,17 @@ fn decode_std<'py>(
                 path: path.as_str(),
                 err: e.to_string(),
             })?;
-            vu.value().into_bound_py_any(py)
+            vu.n.into_bound_py_any(py)
         }
-        "varint32" => Err(PyNotImplementedError::new_err(
-            "varint32 decoding not implemented",
-        )),
+        "varint32" => {
+            let mut vu: VarInt32 = VarInt32::default();
+            decoder.unpack(&mut vu).map_err(|e| DecodeError::Unpack {
+                what: meta.resolved_name.clone(),
+                path: path.as_str(),
+                err: e.to_string(),
+            })?;
+            vu.n.into_bound_py_any(py)
+        }
         "float32" => unpack_prim!(f32),
         "float64" => unpack_prim!(f64),
         "float128" => {
@@ -266,7 +265,8 @@ fn decode_std<'py>(
                 path: path.as_str(),
                 err: e.to_string(),
             })?;
-            PyBytes::new(py, &f.data).into_bound_py_any(py)
+            let bits: u128 = f.f.into();
+            PyBytes::new(py, &bits.to_le_bytes()).into_bound_py_any(py)
         }
         "time_point" => {
             let mut tp: TimePoint = Default::default();

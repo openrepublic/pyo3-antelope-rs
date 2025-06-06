@@ -71,12 +71,12 @@ pub struct PyTransactionHeader {
 impl From<PyTransactionHeader> for TransactionHeader {
     fn from(value: PyTransactionHeader) -> Self {
         TransactionHeader {
-            expiration: TimePointSec::new(value.expiration),
+            expiration: TimePointSec::from(value.expiration),
             ref_block_num: value.ref_block_num,
             ref_block_prefix: value.ref_block_prefix,
-            max_net_usage_words: VarUint32::new(value.max_net_usage_words),
+            max_net_usage_words: VarUint32::from(value.max_net_usage_words),
             max_cpu_usage_ms: value.max_cpu_usage_ms,
-            delay_sec: VarUint32::new(value.delay_sec),
+            delay_sec: VarUint32::from(value.delay_sec),
         }
     }
 }
