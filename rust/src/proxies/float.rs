@@ -6,7 +6,7 @@ use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::PyFloat;
+use pyo3::types::{PyFloat, PyString, PyType};
 
 use std::str::FromStr;
 
@@ -56,14 +56,26 @@ impl PyFloat128 {
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
 
-    #[staticmethod]
-    pub fn try_from(value: Float128Like) -> PyResult<PyFloat128> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: Float128Like
+    ) -> PyResult<PyFloat128> {
         match value {
             Float128Like::Raw(data) => PyFloat128::from_bytes(data),
             Float128Like::Str(s) => PyFloat128::from_str_py(&s),
             Float128Like::Float(py_float) => PyFloat128::from_str_py(&py_float.to_string()),
             Float128Like::Cls(sum) => Ok(sum),
         }
+    }
+
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> String {
+        self.to_string()
     }
 
     pub fn encode(&self) -> Vec<u8> {

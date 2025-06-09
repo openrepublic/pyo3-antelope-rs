@@ -4,6 +4,7 @@ use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::{PyString, PyType};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::str::FromStr;
 
@@ -61,8 +62,11 @@ impl PyPublicKey {
         })
     }
 
-    #[staticmethod]
-    pub fn try_from(value: PubKeyLike) -> PyResult<PyPublicKey> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: PubKeyLike
+    ) -> PyResult<PyPublicKey> {
         match value {
             PubKeyLike::Raw(data) => PyPublicKey::from_bytes(&data),
             PubKeyLike::Str(s) => PyPublicKey::from_str_py(&s),
@@ -70,9 +74,13 @@ impl PyPublicKey {
         }
     }
 
-    #[getter]
-    pub fn raw(&self) -> &[u8] {
-        &self.inner.value
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> Vec<u8> {
+        self.encode()
     }
 
     pub fn encode(&self) -> Vec<u8> {

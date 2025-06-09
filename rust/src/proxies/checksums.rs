@@ -7,6 +7,7 @@ use antelope::chain::checksum::{
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::{PyString, PyType};
 
 #[pyclass(frozen, name = "Checksum160")]
 #[derive(Debug, Clone)]
@@ -48,8 +49,11 @@ impl PyChecksum160 {
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
 
-    #[staticmethod]
-    pub fn try_from(value: Sum160Like) -> PyResult<PyChecksum160> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: Sum160Like
+    ) -> PyResult<PyChecksum160> {
         match value {
             Sum160Like::Raw(data) => PyChecksum160::from_bytes(data),
             Sum160Like::Str(s) => PyChecksum160::from_str_py(&s),
@@ -57,8 +61,16 @@ impl PyChecksum160 {
         }
     }
 
-    #[getter]
-    pub fn raw(&self) -> &[u8; 20] {
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> &[u8; 20] {
+        &self.inner.data
+    }
+
+    pub fn encode(&self) -> &[u8; 20] {
         &self.inner.data
     }
 
@@ -123,8 +135,11 @@ impl PyChecksum256 {
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
 
-    #[staticmethod]
-    pub fn try_from(value: Sum256Like) -> PyResult<PyChecksum256> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: Sum256Like
+    ) -> PyResult<PyChecksum256> {
         match value {
             Sum256Like::Raw(data) => PyChecksum256::from_bytes(data),
             Sum256Like::Str(s) => PyChecksum256::from_str_py(&s),
@@ -132,8 +147,16 @@ impl PyChecksum256 {
         }
     }
 
-    #[getter]
-    pub fn raw(&self) -> &[u8; 32] {
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> &[u8; 32] {
+        &self.inner.data
+    }
+
+    pub fn encode(&self) -> &[u8; 32] {
         &self.inner.data
     }
 
@@ -198,8 +221,11 @@ impl PyChecksum512 {
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
 
-    #[staticmethod]
-    pub fn try_from(value: Sum512Like) -> PyResult<PyChecksum512> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: Sum512Like
+    ) -> PyResult<PyChecksum512> {
         match value {
             Sum512Like::Raw(data) => PyChecksum512::from_bytes(data),
             Sum512Like::Str(s) => PyChecksum512::from_str_py(&s),
@@ -207,8 +233,16 @@ impl PyChecksum512 {
         }
     }
 
-    #[getter]
-    pub fn raw(&self) -> &[u8; 64] {
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> &[u8; 64] {
+        &self.inner.data
+    }
+
+    pub fn encode(&self) -> &[u8; 64] {
         &self.inner.data
     }
 

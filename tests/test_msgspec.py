@@ -1,73 +1,84 @@
 import pytest
-import msgspec
 
-from antelope_rs import Name
-from antelope_rs.codec import dec_hook, enc_hook
+from antelope_rs.abi.structs import to_camel
+from antelope_rs.testing import StdABI
 
-
-class Action(msgspec.Struct):
-    account: Name
-    name: Name
-
-
-
-# start with names as str
-sample_str: dict[str, str] = {
-    'account': 'eosio.token',
-    'name': 'transfer'
-}
-
-# convert dict values to Name
-sample: dict[str, Name] = {
-    k: Name.from_str(v)
-    for k, v in sample_str.items()
-}
-
-# convert dict values to ints
-sample_ints: dict[str, int] = {
-    k: int(n)
-    for k, n in sample.items()
-}
 
 # instantiate the sample struct
-sample_struct = Action(**sample)
+sample = StdABI.Action.try_from({
+    'account': 'eosio.token',
+    'name': 'transfer',
+    'authorization': [],
+    'data': '00010203040506070809',
+})
+
+sample_builtins = sample.to_builtins()
 
 
 @pytest.mark.parametrize(
     'sample_input',
     (
-        sample_str,
-        sample_ints,
         {
-            k: n.encode()
-            for k, n in sample.items()
+            field: (
+                str(getattr(sample, field))
+                if field in ('account', 'name')
+                else getattr(sample, field)
+            )
+            for field in type(sample).__struct_fields__
         },
         {
-            **sample_str,
-            'account': sample_ints['account']
+            field: (
+                int(getattr(sample, field))
+                if field in ('account', 'name')
+                else getattr(sample, field)
+            )
+            for field in type(sample).__struct_fields__
         },
         {
-            **sample_str,
-            'name': sample_ints['name'],
+            field: (
+                getattr(sample, field).encode()
+                if field in ('account', 'name')
+                else getattr(sample, field)
+            )
+            for field in type(sample).__struct_fields__
         }
     ),
     ids=(
         'str_names',
         'int_names',
         'raw_names',
-        'mixed_int_acc_str_name',
-        'mixed_str_acc_int_name'
     )
 )
 def test_action_struct(sample_input):
-    # convert an ensure result is eq to sample_struct
-    convert_result_0 = msgspec.convert(
-        sample_input, type=Action, dec_hook=dec_hook
-    )
-    assert convert_result_0 == sample_struct
+    # convert an ensure result is eq to sample
+    convert_result_0 = StdABI.Action.try_from(sample_input)
+    assert convert_result_0 == sample
 
-    # convert to builtins and ensure result is eq to sample_ints
-    builtins_result_0 = msgspec.to_builtins(
-        convert_result_0, enc_hook=enc_hook
+    # convert to builtins and ensure result is eq
+    builtins_result_0 = convert_result_0.to_builtins()
+    assert builtins_result_0 == sample_builtins
+
+
+@pytest.mark.parametrize(
+    'type_name',
+    (
+        'signed_block',
+        'transaction_variant',
+        'transaction_trace',
+        'transaction_trace_v0',
+        'partial_transaction',
+        'abi_table',
+        'transaction_header'
+    ),
+    ids=lambda x: x
+)
+def test_show_autogen_defs(type_name: str):
+    cls = getattr(StdABI, type_name)
+    assert (
+        cls
+        ==
+        getattr(StdABI, to_camel(type_name))
     )
-    assert builtins_result_0 == sample_ints
+
+    print(f'\n\"{type_name}\" is: ')
+    print(cls.pretty_def_str(indent=1))

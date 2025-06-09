@@ -5,6 +5,7 @@ use antelope::serializer::{Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::types::{PyString, PyType};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::str::FromStr;
 
@@ -52,13 +53,29 @@ impl PyPrivateKey {
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
-    #[staticmethod]
-    pub fn try_from(value: PrivKeyLike) -> PyResult<PyPrivateKey> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: PrivKeyLike
+    ) -> PyResult<PyPrivateKey> {
         match value {
             PrivKeyLike::Raw(data) => PyPrivateKey::from_bytes(&data),
             PrivKeyLike::Str(s) => PyPrivateKey::from_str_py(&s),
             PrivKeyLike::Cls(key) => Ok(key),
         }
+    }
+
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> &[u8] {
+        &self.inner.value
+    }
+
+    pub fn encode(&self) -> &[u8] {
+        &self.inner.value
     }
 
     #[staticmethod]
@@ -93,11 +110,6 @@ impl PyPrivateKey {
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         sig.pack(&mut encoder);
         Ok(encoder.get_bytes().to_vec())
-    }
-
-    #[getter]
-    pub fn raw(&self) -> &[u8] {
-        &self.inner.value
     }
 
     fn __str__(&self) -> String {

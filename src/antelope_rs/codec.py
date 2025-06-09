@@ -1,61 +1,48 @@
+# pyo3-antelope-rs
+# Copyright 2025-eternity Guillermo Rodriguez
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from typing import Any, Type
 
-from antelope_rs import (
-    VarUInt32,
-    VarInt32,
-    Float128,
-    Name,
-    Checksum160,
-    Checksum256,
-    Checksum512,
-    PublicKey,
-    Signature,
-    SymbolCode,
-    Symbol,
-    Asset,
-    ExtendedAsset,
-    TimePoint,
-    TimePointSec,
-    BlockTimestamp
+from .meta import (
+    builtin_classes,
+    TypeAlias
 )
 
+
 def enc_hook(obj: Any) -> Any:
-    match obj:
-        case Float128():
-            return str(obj)
+    if (
+        type(obj) in _convertible_classes
+        or
+        issubclass(type(obj), TypeAlias)
+    ):
+        return obj.to_builtins()
 
-        case (
-            VarUInt32() |
-            VarInt32() |
-            Name() |
-            SymbolCode() |
-            Symbol() |
-            TimePoint() |
-            TimePointSec() |
-            BlockTimestamp()
-        ):
-            return int(obj)
+    else:
+        raise NotImplementedError(f"Objects of type {type} are not supported")
 
-        case (
-            Checksum160() |
-            Checksum256() |
-            Checksum512() |
-            PublicKey() |
-            Signature()
-        ):
-            return obj.raw
 
-        case (
-            Asset() | ExtendedAsset()
-        ):
-            return obj.encode()
-
-        case _:
-            raise NotImplementedError(f"Objects of type {type(obj)} are not supported")
+_convertible_classes: set[Type[Any]] = set(builtin_classes)
 
 
 def dec_hook(type: Type, obj: Any) -> Any:
-    if hasattr(type, 'try_from'):
+    if (
+        type in _convertible_classes
+        or
+        issubclass(type, TypeAlias)
+    ):
         return type.try_from(obj)
+
     else:
         raise NotImplementedError(f"Objects of type {type} are not supported")

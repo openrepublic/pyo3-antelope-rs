@@ -6,6 +6,7 @@ use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::{PyString, PyType};
 
 use std::str::FromStr;
 
@@ -60,14 +61,26 @@ impl PyVarUInt32 {
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
 
-    #[staticmethod]
-    pub fn try_from(value: VarUInt32Like) -> PyResult<PyVarUInt32> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: VarUInt32Like
+    ) -> PyResult<PyVarUInt32> {
         match value {
             VarUInt32Like::Raw(data) => PyVarUInt32::from_bytes(&data),
             VarUInt32Like::Str(s) => PyVarUInt32::from_str_py(&s),
             VarUInt32Like::Int(num) => Ok(PyVarUInt32::from_int(num)),
             VarUInt32Like::Cls(sum) => Ok(sum),
         }
+    }
+
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> u32 {
+        self.inner.n
     }
 
     pub fn encode(&self) -> Vec<u8> {
@@ -196,14 +209,26 @@ impl PyVarInt32 {
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
 
-    #[staticmethod]
-    pub fn try_from(value: VarInt32Like) -> PyResult<PyVarInt32> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: VarInt32Like
+    ) -> PyResult<PyVarInt32> {
         match value {
             VarInt32Like::Raw(data) => PyVarInt32::from_bytes(&data),
             VarInt32Like::Str(s) => PyVarInt32::from_str_py(&s),
             VarInt32Like::Int(num) => Ok(PyVarInt32::from_int(num)),
             VarInt32Like::Cls(sum) => Ok(sum),
         }
+    }
+
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> i32 {
+        self.inner.n
     }
 
     pub fn encode(&self) -> Vec<u8> {

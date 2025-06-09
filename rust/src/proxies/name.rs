@@ -3,6 +3,7 @@ use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::{PyString, PyType};
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
@@ -64,14 +65,26 @@ impl PyName {
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
-    #[staticmethod]
-    pub fn try_from(value: NameLike) -> PyResult<PyName> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: NameLike
+    ) -> PyResult<PyName> {
         match value {
             NameLike::Num(n) => PyName::from_int(n),
             NameLike::Raw(raw) => PyName::from_bytes(&raw),
             NameLike::Str(n_str) => PyName::from_str_py(&n_str),
             NameLike::Cls(n) => Ok(n.clone()),
         }
+    }
+
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> u64 {
+        self.inner.value()
     }
 
     pub fn encode(&self) -> Vec<u8> {

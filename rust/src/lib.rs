@@ -1,6 +1,7 @@
 pub mod proxies;
 pub mod serializer;
 pub mod sign;
+mod utils;
 
 use crate::proxies::abi::{PyShipABI, PyABI};
 use crate::proxies::checksums::{PyChecksum160, PyChecksum256, PyChecksum512};

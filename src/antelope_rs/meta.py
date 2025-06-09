@@ -1,0 +1,788 @@
+# pyo3-antelope-rs
+# Copyright 2025-eternity Guillermo Rodriguez
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+from __future__ import annotations
+
+import re
+import struct
+import types
+from typing import (
+    Any,
+    ClassVar,
+    Protocol,
+    Self,
+    Type,
+    runtime_checkable
+)
+
+import msgspec
+
+from ._lowlevel import (
+    VarUInt32,
+    VarInt32,
+    Float128,
+    Name,
+    Checksum160,
+    Checksum256,
+    Checksum512,
+    PrivateKey,
+    PublicKey,
+    Signature,
+    Asset,
+    ExtendedAsset,
+    SymbolCode,
+    Symbol,
+    TimePoint,
+    TimePointSec,
+    BlockTimestamp,
+    ABI,
+    ShipABI
+)
+
+
+IOTypes = (
+    None | bool | int | float | bytes | str | list | dict
+)
+
+
+@runtime_checkable
+class ABINamespaceType(Protocol):
+
+    @classmethod
+    def try_from(cls, obj: Any) -> Self:
+        ...
+
+    @classmethod
+    def pretty_def_str(cls) -> str:
+        ...
+
+    def to_builtins(self) -> IOTypes:
+        ...
+
+    def encode(self) -> bytes:
+        ...
+
+    def __eq__(self, value: object, /) -> bool:
+        ...
+
+
+BytesLike = bytes | bytearray | memoryview
+
+
+BitLike = BytesLike | int | bool
+
+
+class Bit:
+    value: bool
+
+    def __init__(self, value: bool):
+        self.value = value
+
+    def __repr__(self) -> str:
+        return f'{type(self).pretty_def_str()}({self.value})'
+
+    @classmethod
+    def try_from(cls, obj: BitLike):
+        if isinstance(obj, BytesLike):
+            obj = obj[0]
+
+        if isinstance(obj, cls):
+            obj = obj.value
+
+        return cls(bool(obj))
+
+    @classmethod
+    def pretty_def_str(cls) -> str:
+        return cls.__name__
+
+    def to_builtins(self) -> bool:
+        return self.value
+
+    def encode(self) -> bytes:
+        return (
+            b'\1'
+            if self.value
+            else b'\0'
+        )
+
+    def __eq__(self, value: object, /) -> bool:
+        return self.value == value
+
+    def __hash__(self) -> int:
+        return self.value.__hash__()
+
+
+BoolLike = Bit | int | bool
+
+class Bool:
+    value: bool
+
+    def __init__(self, value: bool):
+        self.value = value
+
+    def __repr__(self) -> str:
+        return f'{type(self).pretty_def_str()}({self.value})'
+
+    @classmethod
+    def try_from(cls, obj: BoolLike):
+        if isinstance(obj, BytesLike):
+            obj = obj[0]
+
+        if isinstance(obj, cls):
+            obj = obj.value
+
+        return cls(bool(obj))
+
+    @classmethod
+    def pretty_def_str(cls) -> str:
+        return cls.__name__
+
+    def to_builtins(self) -> bool:
+        return self.value
+
+    def encode(self) -> bytes:
+        return (
+            b'\1'
+            if self.value
+            else b'\0'
+        )
+
+    def __eq__(self, value: object, /) -> bool:
+        return self.value == value
+
+    def __hash__(self) -> int:
+        return self.value.__hash__()
+
+
+class Bytes:
+    value: bytes
+
+    def __init__(self, n: bytes | bytearray | memoryview):
+        self.value = bytes(n)
+
+    def __len__(self) -> int:
+        return len(self.value)
+
+    def __repr__(self):
+        return f'{type(self).pretty_def_str()}({self.value})'
+
+    @classmethod
+    def try_from(cls, obj: BytesLike):
+        if isinstance(obj, str):
+            obj = bytes.fromhex(obj)
+
+        if isinstance(obj, cls):
+            obj = obj.value
+
+        return cls(obj)
+
+    @classmethod
+    def pretty_def_str(cls) -> str:
+        return cls.__name__
+
+    def to_builtins(self) -> bytes:
+        return self.value
+
+    def encode(self) -> bytes:
+        return VarUInt32(len(self)).encode() + self.value
+
+    def __eq__(self, value: object, /) -> bool:
+        return (
+            len(self) == len(value)
+            and
+            self.value == value
+        )
+
+    def __hash__(self) -> int:
+        return self.value.__hash__()
+
+
+StringLike = BytesLike | str
+
+
+class StrBase:
+    re: ClassVar[str | None]
+    min_length: ClassVar[int | None]
+    max_length: ClassVar[int | None]
+
+    def __init__(self, s: str):
+        self.value = s
+
+    def __len__(self) -> int:
+        return len(self.value)
+
+    def __str__(self) -> str:
+        return self.value
+
+    def __repr__(self):
+        return f'{type(self).pretty_def_str()}({self.value})'
+
+    @classmethod
+    def try_from(cls, obj: StringLike):
+        if isinstance(obj, bytes | bytearray | memoryview):
+            obj = bytearray(obj).decode(encoding='utf-8')
+
+        if isinstance(obj, cls):
+            obj = obj.value
+
+        if (
+            isinstance(cls.min_length, int)
+            and
+            len(obj) < cls.min_length
+        ):
+            raise ValueError(
+                f'{cls.__name__} has minimun length of {cls.min_length} but got: \"{obj}\"'
+            )
+
+        if (
+            isinstance(cls.max_length, int)
+            and
+            len(obj) > cls.max_length
+        ):
+            raise ValueError(
+                f'{cls.__name__} has maximun length of {cls.max_length} but got: \"{obj}\"'
+            )
+
+        if (
+            isinstance(cls.re, str)
+            and
+            re.fullmatch(cls.re, obj) is None
+        ):
+            raise ValueError(
+                f'{cls.__name__} requires input match regex \"{cls.re}\"'
+            )
+
+        return cls(obj)
+
+    @classmethod
+    def pretty_def_str(cls) -> str:
+        return cls.__name__
+
+    def to_builtins(self) -> str:
+        return self.value
+
+    def encode(self) -> bytes:
+        return VarUInt32(len(self)).encode() + self.value.encode(encoding='utf-8')
+
+    def __eq__(self, value: object, /) -> bool:
+        return (
+            len(self) == len(value)
+            and
+            self.value == value
+        )
+
+    def __hash__(self) -> int:
+        return self.value.__hash__()
+
+
+def make_string_type(
+    name: str,
+    re: str | None = None,
+    min_length: int | None = None,
+    max_length: int | None = None
+) -> type:
+    return type(name, (StrBase,), {
+        're': re,
+        'min_length': min_length,
+        'max_length': max_length,
+        '__annotations__': {'value': str}
+    })
+
+String = make_string_type('String')
+
+# type names, alphanumeric can have multiple modifiers (?, $ & []) at the end
+regex_type_name = r'^([A-Za-z_][A-Za-z0-9_]*)(?:\[\]|\?|\$)*$'
+
+TypeNameStr = make_string_type(
+    'TypeNameStr',
+    re=regex_type_name,
+    min_length=1
+)
+
+# ABI struct fields, alphanumeric + '_'
+regex_field_name = r'^[A-Za-z_][A-Za-z0-9_]*$'
+
+FieldNameStr = make_string_type(
+    'FieldNameStr',
+    re=regex_field_name,
+    min_length=1
+)
+
+# Antelope account name(uint64), empty string, lowercase letters, only numbers
+# 1-5 & '.'
+regex_antelope_name = r'^(?:$|[a-z][a-z1-5\.]{0,11}[a-j1-5\.]?)$'
+
+AntelopeNameStr = make_string_type(
+    'AntelopeNameStr',
+    re=regex_antelope_name,
+    min_length=0,
+    max_length=13
+)
+
+# ABI struct, base type name string, like TypeNameStr but with no modifiers,
+# and empty string is allowed
+regex_base_type_name = r'^$|^[A-Za-z_][A-Za-z0-9_]*$'
+
+BaseTypeNameStr = make_string_type(
+    'BaseTypeNameStr',
+    re=regex_base_type_name,
+    min_length=0,
+)
+
+class BitsBase:
+    bit_length: ClassVar[int]
+    length: ClassVar[int]
+
+    def __init__(self, n: bytes | bytearray | memoryview):
+        self.value = bytes(n)
+
+    def __len__(self) -> int:
+        return self.length
+
+    def __repr__(self):
+        return f'{type(self).pretty_def_str()}({self.value})'
+
+    @classmethod
+    def try_from(cls, obj: BytesLike):
+        if isinstance(obj, str):
+            obj = bytes.fromhex(obj)
+
+        if len(obj) != cls.length:
+            raise ValueError(
+                f'{cls.__name__} requires exactly {cls.length} bytes but {len(obj)} where provided'
+            )
+
+        if isinstance(obj, cls):
+            obj = obj.value
+
+        return cls(obj)
+
+    @classmethod
+    def pretty_def_str(cls) -> str:
+        return cls.__name__
+
+    def to_builtins(self) -> bytes:
+        return self.value
+
+    def encode(self) -> bytes:
+        return self.value
+
+    def __eq__(self, value: object, /) -> bool:
+        return (
+            self.bit_length == value.bit_length
+            and
+            self.value == value
+        )
+
+    def __hash__(self) -> int:
+        return self.value.__hash__()
+
+
+def make_bits_type(bit_length: int) -> type:
+    name = f'Bits{bit_length}'
+    return type(name, (BitsBase,), {
+        'bit_length': bit_length,
+        'length': bit_length // 8,
+        '__annotations__': {'value': bytes}
+    })
+
+Bits8 = make_bits_type(8)
+Bits16 = make_bits_type(16)
+Bits32 = make_bits_type(32)
+Bits64 = make_bits_type(64)
+Bits128 = make_bits_type(128)
+Bits160 = make_bits_type(160)
+Bits192 = make_bits_type(192)
+Bits256 = make_bits_type(256)
+Bits512 = make_bits_type(512)
+
+
+# msgspec compatible type hints for all ABI builtin types
+
+_uint_ranges: dict[int, tuple[int, int]] = {
+    bits: (0, (1 << bits) - 1)
+    for bits in (8, 16, 32, 64, 128)
+}
+
+_int_ranges: dict[int, tuple[int, int]] = {
+    bits: (-(1 << (bits - 1)), (1 << (bits - 1)) - 1)
+    for bits in (8, 16, 32, 64, 128)
+}
+
+_float_ranges: dict[int, tuple[float, float]] = {
+    32: (-3.4028234663852886e38, 3.4028234663852886e38),
+    64: (-1.7976931348623157e308, 1.7976931348623157e308),
+}
+
+
+IntLike = bytes | str | int
+
+
+class IntBase:
+    bits: ClassVar[int]
+    signed: ClassVar[bool]
+    _min: ClassVar[int]
+    _max: ClassVar[int]
+
+    def __init__(self, n: int):
+        self.value = n
+
+    def __int__(self):
+        return self.value
+
+    def __repr__(self):
+        return f'{type(self).pretty_def_str()}({self.value})'
+
+    @classmethod
+    def try_from(cls, obj: IntLike):
+        if isinstance(obj, bytes):
+            obj = int.from_bytes(
+                obj,
+                byteorder='little',
+                signed=cls.signed
+            )
+
+        num = int(obj)
+        if not (cls._min <= num <= cls._max):
+            kind = 'signed' if cls.signed else 'unsigned'
+            raise ValueError(
+                f'{num} out of range ({cls._min}, {cls._max}) for {cls.bits}-bit {kind}'
+            )
+
+        if isinstance(obj, cls):
+            obj = obj.value
+
+        return cls(num)
+
+    @classmethod
+    def pretty_def_str(cls) -> str:
+        return cls.__name__
+
+    def to_builtins(self) -> int:
+        return self.value
+
+    def encode(self) -> bytes:
+        return self.value.to_bytes(
+            length=self.bits // 8,
+            byteorder='little',
+            signed=self.signed
+        )
+
+    def __eq__(self, value: object, /) -> bool:
+        return self.value == value
+
+    def __hash__(self) -> int:
+        return self.value
+
+
+def make_int_type(bits: int, signed: bool) -> type:
+    name = f'Int{bits}' if signed else f'UInt{bits}'
+    _min, _max = (_int_ranges if signed else _uint_ranges)[bits]
+    return type(name, (IntBase,), {
+        'bits': bits,
+        'signed': signed,
+        '_min': _min,
+        '_max': _max,
+        '__annotations__': {'value': int}
+    })
+
+
+FloatLike = bytes | str | float
+
+
+class FloatBase:
+    bits: ClassVar[int]
+    _min: ClassVar[float]
+    _max: ClassVar[float]
+
+    def __init__(self, x: float):
+        self.value = x
+
+    def __float__(self):
+        return self.value
+
+    def __repr__(self):
+        return f'{type(self).pretty_def_str()}({self.value})'
+
+    @classmethod
+    def try_from(cls, obj: FloatLike):
+        if isinstance(obj, bytes):
+            fstr = 'f' if cls.bits == 32 else 'd'
+            _, obj = struct.unpack(f'<{fstr}', obj)
+
+        num = float(obj)
+        if not (cls._min <= num <= cls._max):
+            raise ValueError(
+                f'{num} out of range ({cls._min}, {cls._max}) for {cls.bits}-bit float'
+            )
+
+        if isinstance(obj, cls):
+            obj = obj.value
+
+        return cls(num)
+
+    @classmethod
+    def pretty_def_str(cls) -> str:
+        return cls.__name__
+
+    def to_builtins(self) -> float:
+        return self.value
+
+    def encode(self) -> bytes:
+        fstr = 'f' if self.bits == 32 else 'd'
+        return struct.pack(
+            f'<{fstr}',
+            self.value
+        )
+
+    def __eq__(self, value: object, /) -> bool:
+        return self.value == value
+
+    def __hash__(self) -> int:
+        return self.value.__hash__()
+
+
+def make_float_type(bits: int) -> type:
+    _min, _max = _float_ranges[bits]
+    return type(f'Float{bits}', (FloatBase,), {
+        'bits': bits,
+        '_min': _min,
+        '_max': _max,
+        '__annotations__': {'value': float}
+    })
+
+
+Int8 = make_int_type(8, True)
+Int16 = make_int_type(16, True)
+Int32 = make_int_type(32, True)
+Int64 = make_int_type(64, True)
+Int128 = make_int_type(128, True)
+
+UInt8 = make_int_type(8, False)
+UInt16 = make_int_type(16, False)
+UInt32 = make_int_type(32, False)
+UInt64 = make_int_type(64, False)
+UInt128 = make_int_type(128, False)
+
+integer_classes: tuple[Type[IntBase], ...] = (
+    Int8, Int16, Int32, Int64, Int128,
+    UInt8, UInt16, UInt32, UInt64, UInt128,
+)
+
+Float32 = make_float_type(32)
+Float64 = make_float_type(64)
+
+float_classes: tuple[Type[FloatBase], ...] = (Float32, Float64)
+
+# try_from hints for all classes
+Int8Like = Bits8 | str | int
+Int16Like = Bits16 | str | int
+Int32Like = Bits32 | str | int
+Int64Like = Bits64 | str | int
+Int128Like = Bits128 | str | int
+
+UInt8Like = Bits8 | str | int
+UInt16Like = Bits16 | str | int
+UInt32Like = Bits32 | str | int
+UInt64Like = Bits64 | str | int
+UInt128Like = Bits128 | str | int
+
+NameBytes = Bits64
+Sum160Bytes = Bits160
+Sum256Bytes = Bits256
+Sum512Bytes = Bits512
+SymCodeBytes = Bits64
+SymbolBytes = Bits64
+AssetBytes = Bits128
+ExtAssetBytes = Bits192
+TimePointBytes = Bits64
+TimePointSecBytes = Bits32
+BlockTimestampBytes = Bits32
+
+
+# typing hints for each builtin class supporting try_from
+VarUInt32Like = Bits32 | int | str | VarUInt32
+VarInt32Like = Bits32 | int | str | VarInt32
+Float128Like = Bits128 | str | float | Float128
+NameLike = NameBytes | int | str | Name
+Sum160Like = Sum160Bytes | str | Checksum160
+Sum256Like = Sum256Bytes | str | Checksum256
+Sum512Like = Sum512Bytes | str | Checksum512
+PrivKeyLike = bytes | str | PrivateKey
+PubKeyLike = bytes | str | PublicKey
+SigLike = bytes | str | Signature
+SymCodeLike = SymCodeBytes | int | str | SymbolCode
+SymLike = SymbolBytes | int | str | Symbol
+AssetLike = AssetBytes | str | Asset
+ExtAssetLike = ExtAssetBytes | str | ExtendedAsset
+TimePointLike = TimePointBytes | int | str | TimePoint
+TimePointSecLike = TimePointSecBytes | int | str | TimePointSec
+BlockTimestampLike = BlockTimestampBytes | int | str | BlockTimestamp
+
+# map std names to builtin_classes
+builtin_class_map: dict[str, Type[Any]] = {
+    'bool': Bool,
+
+    'int8': Int8,
+    'int16': Int16,
+    'int32': Int32,
+    'int64': Int64,
+    'int128': Int128,
+
+    'uint8': UInt8,
+    'uint16': UInt16,
+    'uint32': UInt32,
+    'uint64': UInt64,
+    'uint128': UInt128,
+
+    'varuint32': VarUInt32,
+    'varint32': VarInt32,
+
+    'float32': Float32,
+    'float64': Float64,
+    'float128': Float128,
+
+    'time_point': TimePoint,
+    'time_point_sec': TimePointSec,
+    'block_timestamp_type': BlockTimestamp,
+
+    'name': Name,
+
+    'bytes': Bytes,
+    'string': String,
+
+    'checksum160': Checksum160,
+    'checksum256': Checksum256,
+    'checksum512': Checksum512,
+
+    'public_key': PublicKey,
+    'signature': Signature,
+
+    'symbol': Symbol,
+    'symbol_code': SymbolCode,
+
+    'asset': Asset,
+    'extended_asset': ExtendedAsset
+}
+
+lowlevel_builtin_classes: tuple[Type[Any], ...] = (
+    VarUInt32,
+    VarInt32,
+    Float128,
+    Name,
+    Checksum160,
+    Checksum256,
+    Checksum512,
+    PrivateKey,
+    PublicKey,
+    Signature,
+    Asset,
+    ExtendedAsset,
+    SymbolCode,
+    Symbol,
+    TimePoint,
+    TimePointSec,
+    BlockTimestamp,
+    ABI,
+    ShipABI
+)
+
+builtin_classes: tuple[Type[Any], ...] = tuple(set((
+    Bit,
+    Bool,
+    Bytes,
+    Bits8,
+    Bits16,
+    Bits32,
+    Bits64,
+    Bits128,
+    Bits160,
+    Bits192,
+    Bits256,
+    Bits512,
+    String,
+    TypeNameStr,
+    FieldNameStr,
+    AntelopeNameStr,
+    BaseTypeNameStr,
+    *integer_classes,
+    *float_classes,
+    *lowlevel_builtin_classes
+)))
+
+# sanity check
+for cls in builtin_classes:
+    if cls in (ShipABI, ABI):
+        continue
+    assert isinstance(cls, ABINamespaceType), f'{cls.__name__} doesnt support ABINamespaceType proto'
+
+
+# type alias factory
+
+class TypeAliasMeta(type):
+    '''
+    Gives nicer `repr` / `str` and forwards `__getattr__` to the target.
+
+    '''
+    def __repr__(cls):
+        return f'<TypeAlias {cls.__name__} = {cls.__value__!s}>'
+
+    def __getattr__(cls, item):
+        '''
+        Allow Alias.attr -> Target.attr
+
+        '''
+        return getattr(cls.__value__, item)
+
+
+class TypeAlias(metaclass=TypeAliasMeta):
+    '''
+    Base class for all generated aliases.
+
+    Each concrete alias class gets a ``__value__`` attribute pointing at the
+    underlying annotation (a concrete class or ``typing.Union``).
+
+    Extra helpers can be mixed-in or patched onto the subclass as normal
+    methods/classmethods.
+
+    '''
+    __value__: ABINamespaceType
+
+    @classmethod
+    def try_from(cls, obj):
+        from antelope_rs.codec import dec_hook
+        return msgspec.convert(
+            obj,
+            type=cls.__value__,
+            dec_hook=dec_hook
+        )
+
+    @staticmethod
+    def from_target(alias: str, target: Type) -> type[TypeAlias]:
+        '''
+        Return a new subclass of *TypeAlias* carrying *target* as ``__value__``.
+
+        '''
+        return types.new_class(
+            alias,
+            (TypeAlias,),
+            exec_body=lambda ns: ns.update(
+                {
+                    '__module__': __name__,
+                    '__qualname__': alias,
+                    '__value__': target,
+                }
+            ),
+        )

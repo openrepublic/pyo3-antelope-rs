@@ -2,8 +2,8 @@ use antelope::chain::asset::{Asset, ExtendedAsset};
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyKeyError, PyValueError};
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::{prelude::*, PyTypeInfo};
+use pyo3::types::{PyDict, PyString, PyType};
 use rust_decimal::Decimal;
 use std::fmt::Display;
 use std::str::FromStr;
@@ -44,8 +44,15 @@ impl From<Asset> for PyAsset {
 #[pymethods]
 impl PyAsset {
     #[new]
-    fn new(amount: i64, sym: SymLike) -> PyResult<Self> {
-        let sym = PySymbol::try_from(sym)?;
+    fn new<'py>(
+        py: Python<'py>,
+        amount: i64,
+        sym: SymLike
+    ) -> PyResult<Self> {
+        let sym = PySymbol::try_from(
+            &PySymbol::type_object(py),
+            sym
+        )?;
         Asset::try_from((amount, sym.inner))
             .map(|a| a.into())
             .map_err(|e| PyValueError::new_err(e.to_string()))
@@ -69,18 +76,28 @@ impl PyAsset {
     }
 
     #[staticmethod]
-    pub fn from_decimal(d: Decimal, sym: SymLike) -> PyResult<Self> {
-        let sym = PySymbol::try_from(sym)?;
+    pub fn from_decimal<'py>(
+        py: Python<'py>,
+        d: Decimal,
+        sym: SymLike
+    ) -> PyResult<Self> {
+        let sym = PySymbol::try_from(
+            &PySymbol::type_object(py),
+            sym
+        )?;
 
         let d_str = d.to_string().replace(".", "");
         let amount = i64::from_str(&d_str)
             .map_err(|e| PyValueError::new_err(format!("Decimal not valid i64: {e}")))?;
 
-        PyAsset::new(amount, SymLike::Cls(sym))
+        PyAsset::new(py, amount, SymLike::Cls(sym))
     }
 
     #[staticmethod]
-    pub fn from_dict<'py>(d: Bound<'py, PyDict>) -> PyResult<Self> {
+    pub fn from_dict<'py>(
+        py: Python<'py>,
+        d: Bound<'py, PyDict>
+    ) -> PyResult<Self> {
         let py_amount = d
             .get_item("amount")?
             .ok_or(PyKeyError::new_err(
@@ -95,19 +112,32 @@ impl PyAsset {
             ))?
             .extract()?;
 
-        PyAsset::new(py_amount, py_symbol)
+        PyAsset::new(py, py_amount, py_symbol)
     }
 
-    #[staticmethod]
-    pub fn try_from<'py>(value: AssetLike<'py>) -> PyResult<PyAsset> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        py: Python<'py>,
+        value: AssetLike<'py>
+    ) -> PyResult<PyAsset> {
         match value {
             AssetLike::Raw(raw) => PyAsset::from_bytes(&raw),
             AssetLike::Str(s) => PyAsset::from_str_py(&s),
-            AssetLike::Int(amount, sym) => PyAsset::new(amount, sym),
-            AssetLike::Decimal(d, sym) => PyAsset::from_decimal(d, sym),
-            AssetLike::Dict(d) => PyAsset::from_dict(d),
+            AssetLike::Int(amount, sym) => PyAsset::new(py, amount, sym),
+            AssetLike::Decimal(d, sym) => PyAsset::from_decimal(py, d, sym),
+            AssetLike::Dict(d) => PyAsset::from_dict(py, d),
             AssetLike::Cls(asset) => Ok(asset),
         }
+    }
+
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> String {
+        self.to_string()
     }
 
     fn to_decimal(&self) -> Decimal {
@@ -230,8 +260,13 @@ impl PyExtendedAsset {
     }
 
     #[staticmethod]
-    pub fn from_dict<'py>(d: Bound<'py, PyDict>) -> PyResult<Self> {
+    pub fn from_dict<'py>(
+        py: Python<'py>,
+        d: Bound<'py, PyDict>
+    ) -> PyResult<Self> {
         let quantity = PyAsset::try_from(
+            &PyAsset::type_object(py),
+            py,
             d.get_item("quantity")?
                 .ok_or(PyKeyError::new_err(
                     "Expected asset dict to have amount key",
@@ -240,6 +275,7 @@ impl PyExtendedAsset {
         )?;
 
         let contract = PyName::try_from(
+            &PyName::type_object(py),
             d.get_item("contract")?
                 .ok_or(PyKeyError::new_err(
                     "Expected asset dict to have amount key",
@@ -254,14 +290,27 @@ impl PyExtendedAsset {
         .into())
     }
 
-    #[staticmethod]
-    pub fn try_from<'py>(value: ExtAssetLike<'py>) -> PyResult<PyExtendedAsset> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        py: Python<'py>,
+        value: ExtAssetLike<'py>
+    ) -> PyResult<PyExtendedAsset> {
         match value {
             ExtAssetLike::Raw(raw) => PyExtendedAsset::from_bytes(&raw),
             ExtAssetLike::Str(s) => PyExtendedAsset::from_str_py(&s),
-            ExtAssetLike::Dict(d) => PyExtendedAsset::from_dict(d),
+            ExtAssetLike::Dict(d) => PyExtendedAsset::from_dict(py, d),
             ExtAssetLike::Cls(ext_asset) => Ok(ext_asset),
         }
+    }
+
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> String {
+        self.to_string()
     }
 
     pub fn encode(&self) -> Vec<u8> {

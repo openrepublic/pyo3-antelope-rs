@@ -7,6 +7,7 @@ use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::{PyString, PyType};
 
 use std::str::FromStr;
 
@@ -61,14 +62,26 @@ impl PyTimePoint {
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
 
-    #[staticmethod]
-    pub fn try_from(value: TimePointLike) -> PyResult<PyTimePoint> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: TimePointLike
+    ) -> PyResult<PyTimePoint> {
         match value {
             TimePointLike::Raw(data) => PyTimePoint::from_bytes(data),
             TimePointLike::Int(num) => Ok(PyTimePoint::from_int(num)),
             TimePointLike::Str(s) => PyTimePoint::from_str_py(&s),
             TimePointLike::Cls(sum) => Ok(sum),
         }
+    }
+
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> u64 {
+        self.inner.elapsed
     }
 
     pub fn encode(&self) -> Vec<u8> {
@@ -149,14 +162,26 @@ impl PyTimePointSec {
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
 
-    #[staticmethod]
-    pub fn try_from(value: TimePointSecLike) -> PyResult<PyTimePointSec> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: TimePointSecLike
+    ) -> PyResult<PyTimePointSec> {
         match value {
             TimePointSecLike::Raw(data) => PyTimePointSec::from_bytes(data),
             TimePointSecLike::Int(num) => Ok(PyTimePointSec::from_int(num)),
             TimePointSecLike::Str(s) => PyTimePointSec::from_str_py(&s),
             TimePointSecLike::Cls(sum) => Ok(sum),
         }
+    }
+
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> u32 {
+        self.inner.seconds
     }
 
     pub fn encode(&self) -> Vec<u8> {
@@ -237,14 +262,26 @@ impl PyBlockTimestamp {
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
 
-    #[staticmethod]
-    pub fn try_from(value: BlockTimestampLike) -> PyResult<PyBlockTimestamp> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: BlockTimestampLike
+    ) -> PyResult<PyBlockTimestamp> {
         match value {
             BlockTimestampLike::Raw(data) => PyBlockTimestamp::from_bytes(data),
             BlockTimestampLike::Int(num) => Ok(PyBlockTimestamp::from_int(num)),
             BlockTimestampLike::Str(s) => PyBlockTimestamp::from_str_py(&s),
             BlockTimestampLike::Cls(sum) => Ok(sum),
         }
+    }
+
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> u32 {
+        self.inner.slot
     }
 
     pub fn encode(&self) -> Vec<u8> {

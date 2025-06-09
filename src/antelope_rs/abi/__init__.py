@@ -19,167 +19,34 @@ import json
 import hashlib
 
 from typing import (
-    Annotated,
     Callable,
     Literal,
-    Type
+    Type,
 )
 from pathlib import Path
 
 from msgspec import (
-    Meta,
     Struct,
     field,
     convert,
 )
 from frozendict import frozendict
 
-from ._lowlevel import (
+from antelope_rs._lowlevel import (
     builtin_types,
     ABI,
     ShipABI,
 )
 
+from antelope_rs.codec import dec_hook
+from antelope_rs.meta import (
+    TypeNameStr,
+    FieldNameStr,
+    AntelopeNameStr,
+    BaseTypeNameStr
+)
+from .structs import build_struct_namespace
 
-# msgspec compatible type hints for different string fields in ABI definitions
-
-# raw ints
-Int32Bytes = Annotated[
-    bytes,
-    Meta(
-        min_length=4,
-        max_length=4
-    )
-]
-
-Int64Bytes = Annotated[
-    bytes,
-    Meta(
-        min_length=8,
-        max_length=8
-    )
-]
-
-NameBytes = Int64Bytes
-SymbolBytes = Int64Bytes
-SymCodeBytes = Int64Bytes
-
-# raw asset & extended_asset
-AssetBytes = Annotated[
-    bytes,
-    Meta(
-        min_length=16,
-        max_length=16
-    )
-]
-ExtAssetBytes = Annotated[
-    bytes,
-    Meta(
-        min_length=24,
-        max_length=24
-    )
-]
-
-# type names, alphanumeric can have multiple modifiers (?, $ & []) at the end
-regex_type_name = r'^([A-Za-z_][A-Za-z0-9_]*)(?:\[\]|\?|\$)*$'
-
-TypeNameStr = Annotated[
-    str,
-    Meta(
-        pattern=regex_type_name,
-        min_length=1,
-    )
-]
-
-# ABI struct fields, alphanumeric + '_'
-regex_field_name = r'^[A-Za-z_][A-Za-z0-9_]*$'
-
-FieldNameStr = Annotated[
-    str,
-    Meta(
-        pattern=regex_field_name,
-        min_length=1,
-    )
-]
-
-# Antelope account name(uint64), empty string, lowercase letters, only numbers
-# 1-5 & '.'
-regex_antelope_name = r'^(?:$|[a-z][a-z1-5\.]{0,11}[a-j1-5\.]?)$'
-
-AntelopeNameStr = Annotated[
-    str,
-    Meta(
-        pattern=regex_antelope_name,
-        min_length=0,
-        max_length=13
-    )
-]
-
-# ABI struct, base type name string, like TypeNameStr but with no modifiers,
-# and empty string is allowed
-regex_base_type_name = r'^$|^[A-Za-z_][A-Za-z0-9_]*$'
-
-BaseTypeNameStr = Annotated[
-    str,
-    Meta(
-        pattern=regex_base_type_name,
-        min_length=0,
-    )
-]
-
-# hex strings
-regex_hex_str = r'^[A-Za-z0-9_]*$'
-Sum160Str = Annotated[
-    str,
-    Meta(
-        pattern=regex_hex_str,
-        min_length=40,
-        max_length=40
-    )
-]
-
-Sum256Str = Annotated[
-    str,
-    Meta(
-        pattern=regex_hex_str,
-        min_length=64,
-        max_length=64
-    )
-]
-
-Sum512Str = Annotated[
-    str,
-    Meta(
-        pattern=regex_hex_str,
-        min_length=128,
-        max_length=128
-    )
-]
-
-# checksum bytes
-Sum160Bytes = Annotated[
-    bytes,
-    Meta(
-        min_length=20,
-        max_length=20
-    )
-]
-
-Sum256Bytes = Annotated[
-    bytes,
-    Meta(
-        min_length=32,
-        max_length=32
-    )
-]
-
-Sum512Bytes = Annotated[
-    bytes,
-    Meta(
-        min_length=64,
-        max_length=64
-    )
-]
 
 TypeModifier = Literal['optional'] | Literal['extension'] | Literal['array']
 TypeSuffix = Literal['?'] | Literal['$'] | Literal['[]']
@@ -272,31 +139,31 @@ def _try_from(cls, abi: ABILike):
 # properties
 def _types(self) -> list[AliasDef]:
     return [
-        convert(type_dict, type=AliasDef)
+        convert(type_dict, type=AliasDef, dec_hook=dec_hook)
         for type_dict in self._types
     ]
 
 def _structs(self) -> list[StructDef]:
     return [
-        convert(struct_dict, type=StructDef)
+        convert(struct_dict, type=StructDef, dec_hook=dec_hook)
         for struct_dict in self._structs
     ]
 
 def _variants(self) -> list[VariantDef]:
     return [
-        convert(variant_dict, type=VariantDef)
+        convert(variant_dict, type=VariantDef, dec_hook=dec_hook)
         for variant_dict in self._variants
     ]
 
 def _actions(self) -> list[VariantDef]:
     return [
-        convert(action_dict, type=VariantDef)
+        convert(action_dict, type=VariantDef, dec_hook=dec_hook)
         for action_dict in self._actions
     ]
 
 def _tables(self) -> list[VariantDef]:
     return [
-        convert(table_dict, type=VariantDef)
+        convert(table_dict, type=VariantDef, dec_hook=dec_hook)
         for table_dict in self._tables
     ]
 
@@ -332,7 +199,7 @@ def _hash(self, *, as_bytes: bool = False) -> str | bytes:
     )
 
 def _resolve_type(self, type_name: str) -> ABIResolvedType:
-    return convert(self.resolve_type_into_dict(type_name), type=ABIResolvedType)
+    return convert(self.resolve_type_into_dict(str(type_name)), type=ABIResolvedType, dec_hook=dec_hook)
 
 # finally monkey patch ABI & ShipABI
 
@@ -395,8 +262,13 @@ def _solve_cls_alias(cls: ABIClassOrAlias = None) -> ABIClass:
     return ret
 
 
-class ABIView:
+class ABIViewMeta(type):
+    '''
+    When a subclass is *created* we already have its ABI definition, so we
+    compute all the expensive maps just once and attach them as **class
+    attributes**.  Instances are never needed.
 
+    '''
     _def: ABI | ShipABI
 
     alias_map: frozendict[TypeNameStr, TypeNameStr]
@@ -404,53 +276,73 @@ class ABIView:
     struct_map: frozendict[TypeNameStr, StructDef]
     valid_types: frozenset[TypeNameStr]
 
-    # only available if antelope_rs.testing is imported
-    make_canonical: Callable
-    canonical_diff: Callable
-    assert_deep_eq: Callable
-    random_of: Callable
+    def __new__(mcls, name, bases, ns, *, definition=None, **kw):
+        cls = super().__new__(mcls, name, bases, ns, **kw)
 
-    def __init__(
-        self,
-        definition: ABI | ShipABI
-    ):
-        self._def = definition
+        # Base ABIView itself has no definition - skip the heavy lifting
+        if definition is None:
+            return cls
 
-        self.alias_map = frozendict({
-            a.new_type_name: a.type_
-            for a in definition.types
+        # build metadata
+        cls._def = definition  # raw Rust object
+
+        cls.alias_map   = frozendict({
+            a.new_type_name: a.type_ for a in definition.types
         })
-        self.struct_map = frozendict({
-            s.name: s
-            for s in definition.structs
-        })
-        self.variant_map = frozendict({
-            e.name: e
-            for e in definition.variants
-        })
-        self.valid_types = frozenset([
+        cls.struct_map  = frozendict({s.name: s for s in definition.structs})
+        cls.variant_map = frozendict({v.name: v for v in definition.variants})
+        cls.valid_types = frozenset([
             *builtin_types,
-            *list(self.struct_map.keys()),
-            *list(self.variant_map.keys()),
-            *list(self.alias_map.keys()),
+            *cls.alias_map, *cls.struct_map, *cls.variant_map
         ])
 
-    @staticmethod
-    def from_str(s: str, cls: ABIClassOrAlias = None) -> ABIView:
-        cls = _solve_cls_alias(cls)
-        return ABIView(cls.from_str(s))
+        # Re-use the existing helper to autogenerate Python structs/aliases
+        tmp_view = object.__new__(ABIView)
+        tmp_view._def = definition
+        tmp_view.alias_map   = cls.alias_map
+        tmp_view.struct_map  = cls.struct_map
+        tmp_view.variant_map = cls.variant_map
+        tmp_view.valid_types = cls.valid_types
+        tmp_view.resolve_type = definition.resolve_type
 
-    @staticmethod
-    def from_file(p: Path | str, cls: ABIClassOrAlias = None) -> ABIView:
-        cls = _solve_cls_alias(cls)
-        return ABIView(cls.from_file(p))
+        for k, v in build_struct_namespace(tmp_view).items():
+            setattr(cls, str(k), v)
 
-    @staticmethod
-    def from_abi(abi: ABI | ShipABI | ABIView) -> ABIView:
-        if isinstance(abi, ABIView):
-            return abi
+        return cls
 
-        return ABIView(abi)
+
+class ABIView(metaclass=ABIViewMeta):
+    '''
+    Pure namespace - don’t instantiate it.  Sub-classes produced by the
+    factory below have all the goodies as *class* attributes.
+    '''
+    # factory
+    @classmethod
+    def from_file(
+        cls,
+        path: str | Path,
+        *,
+        cls_alias: ABIClassOrAlias = None,
+        name: str | None = None,
+    ):
+        '''
+        Read JSON, decide ABI vs ShipABI, and *return a **new subclass*** that
+        carries the parsed definition.
+
+        Example
+        -------
+        Std = ABIView.from_file('standard.json', cls_alias='std')
+        Std.TransactionTrace   # ready to use
+        '''
+        base_cls = _solve_cls_alias(cls_alias)
+        definition = base_cls.from_file(path)
+
+        qualname = (
+            name
+            or f'{Path(path).stem.title()}ABIView'
+        )
+
+        return ABIViewMeta(qualname, (cls,), {}, definition=definition)
 
     @property
     def definition(self) -> ABI | ShipABI:
@@ -476,14 +368,23 @@ class ABIView:
     def tables(self) -> list[TableDef]:
         return self._def.tables
 
-    def hash(self, *, as_bytes: bool = False) -> str | bytes:
-        return self._def.hash(as_bytes=as_bytes)
+    @classmethod
+    def hash(cls, *, as_bytes: bool = False):
+        return cls._def.hash(as_bytes=as_bytes)
 
-    def resolve_type(self, type_name: str) -> ABIResolvedType:
-        return self._def.resolve_type(type_name)
+    @classmethod
+    def resolve_type(cls, type_name: str):
+        return cls._def.resolve_type(type_name)
 
-    def pack(self, *args, **kwargs) -> bytes:
-        return self._def.pack(*args, **kwargs)
+    @classmethod
+    def pack(cls, *a, **kw):
+        return cls._def.pack(*a, **kw)
 
-    def unpack(self, *args, **kwargs) -> bytes:
-        return self._def.unpack(*args, **kwargs)
+    @classmethod
+    def unpack(cls, *a, **kw):
+        return cls._def.unpack(*a, **kw)
+
+    # testing helpers added if antelope_rs.testing imported
+    make_canonical: Callable 
+    canonical_diff: Callable
+    assert_deep_eq: Callable

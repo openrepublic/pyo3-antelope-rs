@@ -9,7 +9,7 @@ use antelope::chain::varint::VarUint32;
 use antelope::util::bytes_to_hex;
 use pyo3::exceptions::PyValueError;
 use pyo3::types::PyDict;
-use pyo3::{pyfunction, FromPyObject, PyResult};
+use pyo3::{pyfunction, FromPyObject, PyResult, PyTypeInfo};
 use std::str::FromStr;
 
 use crate::proxies::checksums::{PyChecksum256, Sum256Like};
@@ -82,14 +82,17 @@ impl From<PyTransactionHeader> for TransactionHeader {
 }
 
 #[pyfunction]
-pub fn sign_tx(
+pub fn sign_tx<'py>(
+    py: Python<'py>,
     chain_id: Sum256Like,
     header: PyTransactionHeader,
     actions: Vec<PyAction>,
     sign_key: &PyPrivateKey,
 ) -> PyResult<Py<PyDict>> {
     // convert to valid checksum256
-    let chain_id = PyChecksum256::try_from(chain_id)?;
+    let chain_id = PyChecksum256::try_from(
+        &PyChecksum256::type_object(py), chain_id
+    )?;
 
     // convert py actions into native
     let mut _actions: Vec<Action> = Vec::with_capacity(actions.len());
@@ -108,7 +111,7 @@ pub fn sign_tx(
     };
 
     // sign using chain id
-    let sign_data = transaction.signing_data(chain_id.raw());
+    let sign_data = transaction.signing_data(chain_id.encode());
     let signed_tx = SignedTransaction {
         transaction,
         signatures: vec![sign_key

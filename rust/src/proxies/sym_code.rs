@@ -3,6 +3,7 @@ use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::{PyString, PyType};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -61,14 +62,26 @@ impl PySymbolCode {
         })
     }
 
-    #[staticmethod]
-    pub fn try_from(value: SymCodeLike) -> PyResult<PySymbolCode> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: SymCodeLike
+    ) -> PyResult<PySymbolCode> {
         match value {
             SymCodeLike::Raw(raw) => PySymbolCode::from_bytes(&raw),
             SymCodeLike::Str(s) => PySymbolCode::from_str_py(&s),
             SymCodeLike::Int(sym) => PySymbolCode::from_int(sym),
             SymCodeLike::Cls(sym) => Ok(sym),
         }
+    }
+
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> u64 {
+        self.inner.value()
     }
 
     #[getter]

@@ -1,19 +1,23 @@
-'''
-Fast, test-oriented generators for Antelope “std” types with RNG-aware cache.
+# pyo3-antelope-rs
+# Copyright 2025-eternity Guillermo Rodriguez
 
-* `random_std_type(type_name, rng=<Random>)`
-  - deterministic if you supply your own `random.Random`.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
-The dispatch table for a given RNG is built at most **once** and then looked
-up from `_GEN_CACHE` (a `weakref.WeakKeyDictionary`).  The default global RNG
-gets its own immutable table `_GLOBAL_GENERATORS`.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 
-'''
-
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from __future__ import annotations
 
 import os
 import json
+from pathlib import Path
 import random
 import string
 import weakref
@@ -44,6 +48,14 @@ inside_ci = any(
     for v in [
         'CI', 'GITHUB_ACTIONS', 'GITLAB_CI', 'TRAVIS', 'CIRCLECI'
     ]
+)
+
+tests_dir = Path(__file__).parent.parent.parent.parent / 'tests'
+testing_abi_dir = tests_dir / 'abis'
+
+StdABI = ABIView.from_file(
+    testing_abi_dir / 'standard.json',
+    cls_alias='std'
 )
 
 

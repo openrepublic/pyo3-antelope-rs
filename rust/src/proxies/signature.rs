@@ -3,6 +3,7 @@ use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::{PyString, PyType};
 use std::str::FromStr;
 
 #[pyclass(frozen, name = "Signature")]
@@ -50,13 +51,25 @@ impl PySignature {
             .map_err(PyValueError::new_err)
     }
 
-    #[staticmethod]
-    pub fn try_from(value: SigLike) -> PyResult<PySignature> {
+    #[classmethod]
+    pub fn try_from<'py>(
+        _cls: &Bound<'py, PyType>,
+        value: SigLike
+    ) -> PyResult<PySignature> {
         match value {
             SigLike::Raw(data) => PySignature::from_bytes(&data),
             SigLike::Str(s) => PySignature::from_str_py(&s),
             SigLike::Cls(key) => Ok(key),
         }
+    }
+
+    #[classmethod]
+    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+        cls.name()
+    }
+
+    pub fn to_builtins(&self) -> Vec<u8> {
+        self.encode()
     }
 
     pub fn encode(&self) -> Vec<u8> {
