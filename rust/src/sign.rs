@@ -90,9 +90,7 @@ pub fn sign_tx<'py>(
     sign_key: &PyPrivateKey,
 ) -> PyResult<Py<PyDict>> {
     // convert to valid checksum256
-    let chain_id = PyChecksum256::try_from(
-        &PyChecksum256::type_object(py), chain_id
-    )?;
+    let chain_id = PyChecksum256::try_from(&PyChecksum256::type_object(py), chain_id)?;
 
     // convert py actions into native
     let mut _actions: Vec<Action> = Vec::with_capacity(actions.len());

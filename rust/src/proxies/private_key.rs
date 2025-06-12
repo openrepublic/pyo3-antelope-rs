@@ -54,10 +54,7 @@ impl PyPrivateKey {
     }
 
     #[classmethod]
-    pub fn try_from<'py>(
-        _cls: &Bound<'py, PyType>,
-        value: PrivKeyLike
-    ) -> PyResult<PyPrivateKey> {
+    pub fn try_from<'py>(_cls: &Bound<'py, PyType>, value: PrivKeyLike) -> PyResult<PyPrivateKey> {
         match value {
             PrivKeyLike::Raw(data) => PyPrivateKey::from_bytes(&data),
             PrivKeyLike::Str(s) => PyPrivateKey::from_str_py(&s),

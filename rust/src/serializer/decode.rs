@@ -1,6 +1,14 @@
 use antelope::{
     chain::{
-        abi::{ABIResolveError, ABIResolvedType, ABITypeResolver, ABIView, TypeModifier}, asset::{Asset, ExtendedAsset, Symbol, SymbolCode}, checksum::{Checksum160, Checksum256, Checksum512}, float::Float128, name::Name, public_key::PublicKey, signature::Signature, time::{BlockTimestamp, TimePoint, TimePointSec}, varint::{VarInt32, VarUint32}
+        abi::{ABIResolveError, ABIResolvedType, ABITypeResolver, ABIView, TypeModifier},
+        asset::{Asset, ExtendedAsset, Symbol, SymbolCode},
+        checksum::{Checksum160, Checksum256, Checksum512},
+        float::Float128,
+        name::Name,
+        public_key::PublicKey,
+        signature::Signature,
+        time::{BlockTimestamp, TimePoint, TimePointSec},
+        varint::{VarInt32, VarUint32},
     },
     serializer::Decoder,
 };
@@ -14,9 +22,7 @@ use thiserror::Error;
 
 use crate::proxies::{
     asset::{PyAsset, PyExtendedAsset},
-    checksums::{
-        PyChecksum160, PyChecksum256, PyChecksum512,
-    },
+    checksums::{PyChecksum160, PyChecksum256, PyChecksum512},
     name::PyName,
     public_key::PyPublicKey,
     signature::PySignature,

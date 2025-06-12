@@ -57,10 +57,7 @@ impl PyFloat128 {
     }
 
     #[classmethod]
-    pub fn try_from<'py>(
-        _cls: &Bound<'py, PyType>,
-        value: Float128Like
-    ) -> PyResult<PyFloat128> {
+    pub fn try_from<'py>(_cls: &Bound<'py, PyType>, value: Float128Like) -> PyResult<PyFloat128> {
         match value {
             Float128Like::Raw(data) => PyFloat128::from_bytes(&data),
             Float128Like::Str(s) => PyFloat128::from_str_py(&s),

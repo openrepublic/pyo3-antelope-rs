@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::ops::{Add, Div, Mul, Sub};
 
-use antelope::chain::varint::{VarUint32, VarInt32};
+use antelope::chain::varint::{VarInt32, VarUint32};
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
@@ -62,10 +62,7 @@ impl PyVarUInt32 {
     }
 
     #[classmethod]
-    pub fn try_from<'py>(
-        _cls: &Bound<'py, PyType>,
-        value: VarUInt32Like
-    ) -> PyResult<PyVarUInt32> {
+    pub fn try_from<'py>(_cls: &Bound<'py, PyType>, value: VarUInt32Like) -> PyResult<PyVarUInt32> {
         match value {
             VarUInt32Like::Raw(data) => PyVarUInt32::from_bytes(&data),
             VarUInt32Like::Str(s) => PyVarUInt32::from_str_py(&s),
@@ -215,10 +212,7 @@ impl PyVarInt32 {
     }
 
     #[classmethod]
-    pub fn try_from<'py>(
-        _cls: &Bound<'py, PyType>,
-        value: VarInt32Like
-    ) -> PyResult<PyVarInt32> {
+    pub fn try_from<'py>(_cls: &Bound<'py, PyType>, value: VarInt32Like) -> PyResult<PyVarInt32> {
         match value {
             VarInt32Like::Raw(data) => PyVarInt32::from_bytes(&data),
             VarInt32Like::Str(s) => PyVarInt32::from_str_py(&s),

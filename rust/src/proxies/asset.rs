@@ -2,14 +2,14 @@ use antelope::chain::asset::{Asset, ExtendedAsset};
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyKeyError, PyValueError};
-use pyo3::{prelude::*, PyTypeInfo};
 use pyo3::types::{PyDict, PyString, PyType};
+use pyo3::{prelude::*, PyTypeInfo};
 use rust_decimal::Decimal;
 use std::fmt::Display;
 use std::str::FromStr;
 
 use crate::proxies::{
-    name::{PyName, NameLike},
+    name::{NameLike, PyName},
     sym::{PySymbol, SymLike},
 };
 
@@ -44,15 +44,8 @@ impl From<Asset> for PyAsset {
 #[pymethods]
 impl PyAsset {
     #[new]
-    fn new<'py>(
-        py: Python<'py>,
-        amount: i64,
-        sym: SymLike
-    ) -> PyResult<Self> {
-        let sym = PySymbol::try_from(
-            &PySymbol::type_object(py),
-            sym
-        )?;
+    fn new<'py>(py: Python<'py>, amount: i64, sym: SymLike) -> PyResult<Self> {
+        let sym = PySymbol::try_from(&PySymbol::type_object(py), sym)?;
         Asset::try_from((amount, sym.inner))
             .map(|a| a.into())
             .map_err(|e| PyValueError::new_err(e.to_string()))
@@ -76,15 +69,8 @@ impl PyAsset {
     }
 
     #[staticmethod]
-    pub fn from_decimal<'py>(
-        py: Python<'py>,
-        d: Decimal,
-        sym: SymLike
-    ) -> PyResult<Self> {
-        let sym = PySymbol::try_from(
-            &PySymbol::type_object(py),
-            sym
-        )?;
+    pub fn from_decimal<'py>(py: Python<'py>, d: Decimal, sym: SymLike) -> PyResult<Self> {
+        let sym = PySymbol::try_from(&PySymbol::type_object(py), sym)?;
 
         let d_str = d.to_string().replace(".", "");
         let amount = i64::from_str(&d_str)
@@ -94,10 +80,7 @@ impl PyAsset {
     }
 
     #[staticmethod]
-    pub fn from_dict<'py>(
-        py: Python<'py>,
-        d: Bound<'py, PyDict>
-    ) -> PyResult<Self> {
+    pub fn from_dict<'py>(py: Python<'py>, d: Bound<'py, PyDict>) -> PyResult<Self> {
         let py_amount = d
             .get_item("amount")?
             .ok_or(PyKeyError::new_err(
@@ -119,7 +102,7 @@ impl PyAsset {
     pub fn try_from<'py>(
         _cls: &Bound<'py, PyType>,
         py: Python<'py>,
-        value: AssetLike<'py>
+        value: AssetLike<'py>,
     ) -> PyResult<PyAsset> {
         match value {
             AssetLike::Raw(raw) => PyAsset::from_bytes(&raw),
@@ -260,10 +243,7 @@ impl PyExtendedAsset {
     }
 
     #[staticmethod]
-    pub fn from_dict<'py>(
-        py: Python<'py>,
-        d: Bound<'py, PyDict>
-    ) -> PyResult<Self> {
+    pub fn from_dict<'py>(py: Python<'py>, d: Bound<'py, PyDict>) -> PyResult<Self> {
         let quantity = PyAsset::try_from(
             &PyAsset::type_object(py),
             py,
@@ -294,7 +274,7 @@ impl PyExtendedAsset {
     pub fn try_from<'py>(
         _cls: &Bound<'py, PyType>,
         py: Python<'py>,
-        value: ExtAssetLike<'py>
+        value: ExtAssetLike<'py>,
     ) -> PyResult<PyExtendedAsset> {
         match value {
             ExtAssetLike::Raw(raw) => PyExtendedAsset::from_bytes(&raw),

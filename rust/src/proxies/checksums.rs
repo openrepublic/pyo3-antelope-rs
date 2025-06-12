@@ -8,7 +8,6 @@ use pyo3::types::{PyString, PyType};
 
 use crate::utils::try_decode_string_bytes;
 
-
 /// Generate Python‑facing checksum wrappers with PyO3.
 ///
 /// Each tuple argument expands to a complete wrapper:
@@ -95,7 +94,6 @@ macro_rules! define_checksum_py {
         )+
     };
 }
-
 
 define_checksum_py!(
     (PyChecksum160, "Checksum160", Sum160Like, Checksum160, 20),

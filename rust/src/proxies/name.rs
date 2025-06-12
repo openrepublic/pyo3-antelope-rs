@@ -66,10 +66,7 @@ impl PyName {
     }
 
     #[classmethod]
-    pub fn try_from<'py>(
-        _cls: &Bound<'py, PyType>,
-        value: NameLike
-    ) -> PyResult<PyName> {
+    pub fn try_from<'py>(_cls: &Bound<'py, PyType>, value: NameLike) -> PyResult<PyName> {
         match value {
             NameLike::Num(n) => PyName::from_int(n),
             NameLike::Raw(raw) => PyName::from_bytes(&raw),

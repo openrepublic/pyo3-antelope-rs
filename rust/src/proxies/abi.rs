@@ -1,7 +1,5 @@
 use crate::serializer::{decode::decode_abi_type, encode::encode_abi_type};
-use antelope::chain::abi::{
-    ABITypeResolver, AbiStruct, AbiTableView, AbiVariant, ShipABI, ABI,
-};
+use antelope::chain::abi::{ABITypeResolver, AbiStruct, AbiTableView, AbiVariant, ShipABI, ABI};
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyTypeError, PyValueError};

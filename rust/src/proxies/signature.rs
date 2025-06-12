@@ -53,10 +53,7 @@ impl PySignature {
     }
 
     #[classmethod]
-    pub fn try_from<'py>(
-        _cls: &Bound<'py, PyType>,
-        value: SigLike
-    ) -> PyResult<PySignature> {
+    pub fn try_from<'py>(_cls: &Bound<'py, PyType>, value: SigLike) -> PyResult<PySignature> {
         match value {
             SigLike::Raw(data) => PySignature::from_bytes(&data),
             SigLike::Str(s) => PySignature::from_str_py(&s),

@@ -1,8 +1,6 @@
 use std::fmt::Display;
 
-use antelope::chain::time::{
-    TimePoint, TimePointSec, BlockTimestamp
-};
+use antelope::chain::time::{BlockTimestamp, TimePoint, TimePointSec};
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
@@ -63,10 +61,7 @@ impl PyTimePoint {
     }
 
     #[classmethod]
-    pub fn try_from<'py>(
-        _cls: &Bound<'py, PyType>,
-        value: TimePointLike
-    ) -> PyResult<PyTimePoint> {
+    pub fn try_from<'py>(_cls: &Bound<'py, PyType>, value: TimePointLike) -> PyResult<PyTimePoint> {
         match value {
             TimePointLike::Raw(data) => PyTimePoint::from_bytes(&data),
             TimePointLike::Int(num) => Ok(PyTimePoint::from_int(num)),
@@ -165,7 +160,7 @@ impl PyTimePointSec {
     #[classmethod]
     pub fn try_from<'py>(
         _cls: &Bound<'py, PyType>,
-        value: TimePointSecLike
+        value: TimePointSecLike,
     ) -> PyResult<PyTimePointSec> {
         match value {
             TimePointSecLike::Raw(data) => PyTimePointSec::from_bytes(&data),
@@ -265,7 +260,7 @@ impl PyBlockTimestamp {
     #[classmethod]
     pub fn try_from<'py>(
         _cls: &Bound<'py, PyType>,
-        value: BlockTimestampLike
+        value: BlockTimestampLike,
     ) -> PyResult<PyBlockTimestamp> {
         match value {
             BlockTimestampLike::Raw(data) => PyBlockTimestamp::from_bytes(&data),

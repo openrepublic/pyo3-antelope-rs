@@ -49,24 +49,19 @@ impl PySymbolCode {
     #[pyo3(name = "from_str")]
     pub fn from_str_py(sym: &str) -> PyResult<Self> {
         Ok(PySymbolCode {
-            inner: SymbolCode::from_str(sym)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+            inner: SymbolCode::from_str(sym).map_err(|e| PyValueError::new_err(e.to_string()))?,
         })
     }
 
     #[staticmethod]
     pub fn from_int(sym: u64) -> PyResult<Self> {
         Ok(PySymbolCode {
-            inner: SymbolCode::try_from(sym)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+            inner: SymbolCode::try_from(sym).map_err(|e| PyValueError::new_err(e.to_string()))?,
         })
     }
 
     #[classmethod]
-    pub fn try_from<'py>(
-        _cls: &Bound<'py, PyType>,
-        value: SymCodeLike
-    ) -> PyResult<PySymbolCode> {
+    pub fn try_from<'py>(_cls: &Bound<'py, PyType>, value: SymCodeLike) -> PyResult<PySymbolCode> {
         match value {
             SymCodeLike::Raw(raw) => PySymbolCode::from_bytes(&raw),
             SymCodeLike::Str(s) => PySymbolCode::from_str_py(&s),

@@ -60,10 +60,7 @@ impl PySymbol {
     }
 
     #[classmethod]
-    pub fn try_from<'py>(
-        _cls: &Bound<'py, PyType>,
-        value: SymLike
-    ) -> PyResult<PySymbol> {
+    pub fn try_from<'py>(_cls: &Bound<'py, PyType>, value: SymLike) -> PyResult<PySymbol> {
         match value {
             SymLike::Raw(raw) => PySymbol::from_bytes(&raw),
             SymLike::Str(s) => PySymbol::from_str_py(&s),

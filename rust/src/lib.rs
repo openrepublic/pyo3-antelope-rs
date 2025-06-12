@@ -3,12 +3,17 @@ pub mod serializer;
 pub mod sign;
 mod utils;
 
-use crate::proxies::abi::{PyShipABI, PyABI};
+use crate::proxies::abi::{PyABI, PyShipABI};
 use crate::proxies::checksums::{PyChecksum160, PyChecksum256, PyChecksum512};
 use crate::proxies::private_key::PyPrivateKey;
 use crate::proxies::public_key::PyPublicKey;
 use crate::proxies::signature::PySignature;
-use crate::proxies::{asset::{PyAsset, PyExtendedAsset}, name::PyName, sym::PySymbol, sym_code::PySymbolCode};
+use crate::proxies::{
+    asset::{PyAsset, PyExtendedAsset},
+    name::PyName,
+    sym::PySymbol,
+    sym_code::PySymbolCode,
+};
 use crate::sign::sign_tx;
 use antelope::chain::abi::BUILTIN_TYPES;
 use proxies::float::PyFloat128;
@@ -64,7 +69,10 @@ fn antelope_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add("PanicException", py.get_type::<PanicException>())?;
     m.add("TryFromError", py.get_type::<TryFromError>())?;
-    m.add("BytesStringDecodeError", py.get_type::<BytesStringDecodeError>())?;
+    m.add(
+        "BytesStringDecodeError",
+        py.get_type::<BytesStringDecodeError>(),
+    )?;
 
     Ok(())
 }

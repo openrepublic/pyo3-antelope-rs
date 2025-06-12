@@ -64,10 +64,7 @@ impl PyPublicKey {
     }
 
     #[classmethod]
-    pub fn try_from<'py>(
-        _cls: &Bound<'py, PyType>,
-        value: PubKeyLike
-    ) -> PyResult<PyPublicKey> {
+    pub fn try_from<'py>(_cls: &Bound<'py, PyType>, value: PubKeyLike) -> PyResult<PyPublicKey> {
         match value {
             PubKeyLike::Raw(data) => PyPublicKey::from_bytes(&data),
             PubKeyLike::Str(s) => PyPublicKey::from_str_py(&s),
