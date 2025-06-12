@@ -9,6 +9,7 @@ dependencies = [
     'frozendict>=2.4.6',
     'maturin>=1.8.2',
     'msgspec>=0.19.0',
+    'typing-extensions>=4.14.0',
 ]
 
 [build-system]
@@ -16,15 +17,20 @@ requires = ['maturin>=1.0,<2.0']
 build-backend = 'maturin'
 
 [tool.maturin]
+# profile = 'release-with-debug'
+profile = 'release'
 python-source = 'src'
 python-packages = ['antelope_rs']
 module-name = 'antelope_rs._lowlevel'
 manifest-path = 'rust/Cargo.toml'
 features = ['pyo3/extension-module', 'pyo3/abi3-py39']
+include = ['src/antelope_rs/abi/*.json']
 
 [dependency-groups]
 dev = [
     'deepdiff>=8.5.0',
-    "pdbp>=1.7.0",
-    "pytest>=8.4.0",
+    'hypothesis>=6.135.1',
+    'pdbp>=1.7.0',
+    'pytest>=8.4.0',
+    'pytest-xdist>=3.7.0',
 ]

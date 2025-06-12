@@ -15,27 +15,40 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from __future__ import annotations
 
-import re
 import inspect
 
+from types import ModuleType
+import types
 from typing import (
     Any,
     ForwardRef,
     Type,
     Union,
-    get_type_hints
+    get_type_hints,
 )
 
 import msgspec
 
 import antelope_rs
+
 from antelope_rs.meta import (
-    TypeAlias,
-    TypeNameStr,
+    ABINamespaceType,
+    BytesLike,
+    IOTypes,
     builtin_class_map,
     builtin_classes,
 )
-from ..codec import dec_hook, enc_hook
+from antelope_rs.utils import (
+    to_camel,
+    to_snake,
+    validate_protocol
+)
+
+from ._struct import (
+    TypeAlias,
+    Variant,
+    Struct as AntelopeStruct,
+)
 
 
 # ABI namespace type debug str helpers
@@ -185,9 +198,11 @@ def pretty_abi_type_def(
     return txt
 
 
+# automatic msgspec struct from ABI
+
 # modifier helpers
 
-def _apply_modifiers(ann, modifiers: list):
+def _apply_modifiers(ann, modifiers: list) -> Type[Any]:
     '''
     Wrap *ann* with list/Optional according to rust‐side modifiers.
 
@@ -199,11 +214,12 @@ def _apply_modifiers(ann, modifiers: list):
             else
             str(m)
         )
-        if m == 'array':
-            ann = list[ann]  # PEP-585
+        match m:
+            case 'array':
+                ann = list[ann]  # PEP-585
 
-        elif m in ('optional', 'extension'):
-            ann = Union.__getitem__((ann, type(None)))  # type: ignore
+            case 'optional' | 'extension':
+                ann = Union.__getitem__((ann, type(None)))  # type: ignore
 
     return ann
 
@@ -226,27 +242,84 @@ def _union(*xs):
     return Union.__getitem__(tuple(conv))  # type: ignore
 
 
-# name helpers
+class BuiltinWrapper(msgspec.Struct, frozen=True):
+    __abi_type__: str
+    value: ABINamespaceType
 
-_CAMEL_RE = re.compile(r"(?:^|_)([a-zA-Z0-9]+)")
+    @classmethod
+    def from_bytes(cls, raw: BytesLike) -> ABINamespaceType:
+        ...
 
-def to_camel(s: TypeNameStr) -> str:
+    def encode(self) -> bytes:
+        ...
+
+    def to_builtins(self) -> IOTypes:
+        ...
+
+
+def _wrap_as_struct(
+    name: str,
+    inner_ann: Any,
+    module: ModuleType,
+    tag: str,
+    tag_field: str,
+) -> type[msgspec.Struct]:
     '''
-    Convert snake_case string to CamelCase
+    Produce a 1-field Struct so builtin/alias types can sit inside a tagged union.
 
     '''
-    return ''.join(
-        m.group(1).capitalize()
-        for m in _CAMEL_RE.finditer(str(s))
+    if isinstance(inner_ann, ForwardRef):
+        inner_ann = module.__dict__[to_snake(inner_ann.__forward_arg__)]
+
+    cls: Type[BuiltinWrapper] = msgspec.defstruct(  # type: ignore
+        to_camel(name),
+        [('value', inner_ann)],
+        tag=tag,
+        tag_field=tag_field,
+        module=module.__name__,
     )
 
+    cls.encode = lambda self: self.value.encode()
+    cls.to_builtins = lambda self: self.value.to_builtins()
+    cls.__abi_type__ = name
+
+    @classmethod
+    def _from_bytes(inner_cls, raw: BytesLike) -> ABINamespaceType:
+        val_ann = inner_cls.__annotations__['value']
+        return inner_cls(val_ann.from_bytes(raw))
+
+    cls.from_bytes = _from_bytes
+
+    return cls
+
+
+def _expand_struct_fields(
+    abi: antelope_rs.abi.ABIView,
+    sdef: antelope_rs.abi.StructDef
+) -> list[tuple[str, antelope_rs.abi.ABIResolvedType]]:
+    '''
+    Recursivly expand struct base fields
+
+    '''
+    abi_fields = []
+    if sdef.base:
+        base_sdef = abi.struct_map[sdef.base]
+        abi_fields = _expand_struct_fields(abi, base_sdef)
+
+    abi_fields += [
+        (str(fld.name), abi.resolve_type(fld.type_))
+        for fld in abi.struct_map[sdef.name].fields
+    ]
+
+    return abi_fields
 
 # main builder
 
 def build_struct_namespace(
     abi: 'antelope_rs.abi.ABIView',
+    module: ModuleType,
     *,
-    tag_field: str = 'type',
+    tag_field: str = 'antelope_type',
 ) -> dict[str, type]:
     '''
     Generate python classes mirroring *abi*’s structs/aliases.
@@ -255,14 +328,14 @@ def build_struct_namespace(
     structs: dict[str, Type] = {}
     pyname_map: dict[str, str] = {}  # ABI type name -> CamelCase
 
-    tagged_structs = {
-        abi.resolve_type(t).resolved_name
+    tagged_structs: dict[str, tuple[str, int]] = {
+        str(abi.resolve_type(t).resolved_name): (str(v.name), i)
         for v in abi.variants
-        for t in v.types
+        for i, t in enumerate(v.types)
         if abi.resolve_type(t).is_struct
     }
 
-    def resolve_ann(type_str: str):
+    def resolve_ann(type_str: str) -> tuple[antelope_rs.abi.ABIResolvedType, Type[Any]]:
         info = abi.resolve_type(type_str)
 
         # base
@@ -273,35 +346,35 @@ def build_struct_namespace(
             py_name = pyname_map.setdefault(
                 info.resolved_name, to_camel(info.resolved_name)
             )
-            ann = structs.get(info.resolved_name) or ForwardRef(py_name)
+            ann = structs.get(str(info.resolved_name)) or ForwardRef(py_name)
 
         elif info.is_variant is not None:
-            # forward-ref to the alias – will be patched later
+            # forward-ref to the alias - will be patched later
             py_name = pyname_map.setdefault(
                 info.resolved_name, to_camel(info.resolved_name)
             )
             ann = ForwardRef(py_name)
 
         else:  # pragma: no cover - rust guarantees we never get here
-            raise KeyError(f"Unhandled ABI kind for {type_str}")
+            raise KeyError(f'Unhandled ABI kind for {type_str}')
 
         # wrap with modifiers
-        return _apply_modifiers(ann, info.modifiers)
+        return info, _apply_modifiers(ann, info.modifiers)
 
     # build dependency graph                                               #
-    pending = {s.name: s for s in abi.structs}
+    pending = {str(s.name): s for s in abi.structs}
     deps = {name: set() for name in pending}
 
     for name, s in pending.items():
         if s.base:
             base_info = abi.resolve_type(s.base)
             if base_info.is_struct:
-                deps[name].add(base_info.resolved_name)
+                deps[name].add(str(base_info.resolved_name))
 
         for f in s.fields:
             finfo = abi.resolve_type(f.type_)
             if finfo.is_struct:
-                deps[name].add(finfo.resolved_name)
+                deps[name].add(str(finfo.resolved_name))
 
     while pending:
         ready = [n for n, d in deps.items() if d <= structs.keys()]
@@ -314,105 +387,103 @@ def build_struct_namespace(
 
             py_name = pyname_map.setdefault(name, to_camel(name))
 
-            bases = ((structs[sdef.base],) if sdef.base else ())
+            base = structs[str(sdef.base)] if sdef.base else None
 
-            fields = [
-                (str(fld.name), resolve_ann(fld.type_))
+            fields = {
+                str(fld.name): resolve_ann(fld.type_)
                 for fld in sdef.fields
-            ]
+            }
 
-            kw = {}
+            kw: dict[str, Any] = dict(tag=False, tag_field=None)
             if name in tagged_structs:
+                # only the true union variants get a tag
                 kw = dict(tag_field=tag_field, tag=str(name))
 
-            cls = msgspec.defstruct(
+
+            bases = tuple(
+                b for b in (base, AntelopeStruct)   # base first, mix-in last to avoid MRO issues
+                if b is not None
+            )
+
+            cls: Type[AntelopeStruct] = msgspec.defstruct(  # type: ignore
                 py_name,
-                fields,
-                bases=bases,
-                module=__name__,
+                [(key, info[1]) for key, info in fields.items()],
+                bases=bases if bases else (AntelopeStruct,),
+                module=module.__name__,
                 **kw,
             )
 
-            def gen_eq_for_cls(cls):
-                field_names = cls.__struct_fields__
-                def _eq(self, other) -> bool:
-                    for name in field_names:
-                        if not (
-                            hasattr(self, name)
-                            or
-                            hasattr(other, name)
-                            or
-                            getattr(self, name) == getattr(other, name)
-                        ):
-                            return False
+            cls.__abi_type__   = name
+            cls.__abi_fields__ = _expand_struct_fields(abi, sdef)
 
-                    return True
+            pipelines: list[tuple[str, list[str]]] = [
+                (fname, list(meta.modifiers))
+                for fname, meta in cls.__abi_fields__
+            ]
+            cls._ENC_PIPELINES = pipelines
+            cls._BLT_PIPELINES = pipelines
 
-                return _eq
+            setattr(module, str(name), cls)
+            structs[str(name)] = cls
 
-            cls.__eq__ = gen_eq_for_cls(cls)
 
-            # export to namespace
-            structs[name] = cls
+        # variant aliases
+        for vdef in abi.variants:
+            v_name  = str(vdef.name)
+            py_name = pyname_map.setdefault(v_name, to_camel(v_name))
 
-    # variant aliases
-    for vdef in abi.variants:
-        v_name = vdef.name  # snake_case
-        py_name  = pyname_map.setdefault(v_name, to_camel(v_name))
+            union_members = []
+            for i, t in enumerate(vdef.types):
+                info, ann = resolve_ann(t)
 
-        # build the Union (may be one member only)
-        union_ann = _union(*(resolve_ann(t) for t in vdef.types))
+                # scalars -> wrapper structs, structs stay untouched
+                if info.is_struct:
+                    union_members.append(ann)
+                else:
+                    wrapper = _wrap_as_struct(
+                        name=f'{v_name}_{i}',
+                        inner_ann=ann,
+                        module=module,
+                        tag=v_name,
+                        tag_field=tag_field,
+                    )
+                    union_members.append(wrapper)
 
-        # keep *alias* identity even for 1-item variants
-        alias_obj = TypeAlias.from_target(py_name, union_ann)
+            union_ann = _union(*union_members)
 
-        structs[v_name] = alias_obj
+            # concrete subclass of Variant
+            alias_obj = types.new_class(
+                py_name, (Variant,),
+                exec_body=lambda ns: ns.update({
+                    '__module__' : module.__name__,
+                    '__qualname__': py_name,
+                    '__abi_type__': v_name,
+                    '__value__'   : union_ann,
+                })
+            )
+
+            setattr(module, v_name, alias_obj)
+            structs[v_name] = alias_obj
 
     # publish aliases
     for alias in abi.types:
-        alias_name = alias.new_type_name
+        alias_name = str(alias.new_type_name)
         if alias_name in structs:  # already registered
             continue
 
-        # If something with that snake_case name is already present
-        # (e.g. a real struct), just add the CamelCase mirror and move on.
-        if alias_name in structs:
-            continue
-
-        resolved_ann = resolve_ann(alias_name)
+        _, resolved_ann = resolve_ann(alias_name)
         alias_obj = TypeAlias.from_target(
             to_camel(alias_name), resolved_ann
         )
 
+        setattr(module, alias_name, alias_obj)
         structs[alias_name] = alias_obj
 
     # add converters & pretty_str as well as re-export CamelCase type in namespace
     for name, cls in list(structs.items()):
-        if not hasattr(cls, 'try_from'):
-            def _try_from(cls, obj: Any) -> msgspec.Struct:
-                return msgspec.convert(
-                    obj,
-                    type=cls,
-                    dec_hook=dec_hook
-                )
-
-            cls.try_from = classmethod(_try_from)
-
-        def _to_builtins(self) -> Any:
-            return msgspec.to_builtins(
-                self,
-                enc_hook=enc_hook
-            )
-
-        cls.to_builtins = _to_builtins
-
-        def _pretty_def_str(cls, **kwargs) -> str:
-            return pretty_abi_type_def(cls, **kwargs)
-
-        cls.pretty_def_str = classmethod(_pretty_def_str)
-        cls.__abi_type__ = name
-
+        validate_protocol(cls, ABINamespaceType)
         cam_name = to_camel(name)
+        setattr(module, cam_name, cls)
         structs[cam_name] = cls
 
     return structs

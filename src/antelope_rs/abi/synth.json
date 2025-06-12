@@ -1,0 +1,235 @@
+{
+    "version": "pyo3-antelope.testing/1.0",
+    "types": [
+        {
+            "new_type_name": "id_type",
+            "type": "uint64"
+        },
+        {
+            "new_type_name": "optional_id",
+            "type": "id_type?"
+        },
+        {
+            "new_type_name": "id_array",
+            "type": "id_type[]"
+        },
+        {
+            "new_type_name": "layer_alias",
+            "type": "variant_layered"
+        },
+        {
+            "new_type_name": "name_list",
+            "type": "name[]?"
+        }
+    ],
+    "variants": [
+        {
+            "name": "variant_mixed",
+            "types": [
+                "checksum256",
+                "complex_struct"
+            ]
+        },
+        {
+            "name": "variant_layered",
+            "types": [
+                "variant_mixed",
+                "nested_struct"
+            ]
+        }
+    ],
+    "structs": [
+        {
+            "name": "base_struct",
+            "fields": [
+                {
+                    "name": "flag",
+                    "type": "bool"
+                },
+                {
+                    "name": "data",
+                    "type": "bytes?"
+                }
+            ]
+        },
+        {
+            "name": "complex_struct",
+            "base": "base_struct",
+            "fields": [
+                {
+                    "name": "ids",
+                    "type": "id_array?"
+                },
+                {
+                    "name": "value",
+                    "type": "float64"
+                },
+                {
+                    "name": "payload",
+                    "type": "string$"
+                }
+            ]
+        },
+        {
+            "name": "nested_struct",
+            "fields": [
+                {
+                    "name": "header",
+                    "type": "complex_struct"
+                },
+                {
+                    "name": "extra",
+                    "type": "optional_id"
+                }
+            ]
+        },
+        {
+            "name": "big_struct",
+            "fields": [
+                {
+                    "name": "variant_field",
+                    "type": "variant_mixed"
+                },
+                {
+                    "name": "nested_array",
+                    "type": "nested_struct[][]"
+                },
+                {
+                    "name": "ext_field",
+                    "type": "uint8$"
+                }
+            ]
+        },
+        {
+            "name": "all_builtins_struct",
+            "fields": [
+                {
+                    "name": "bool",
+                    "type": "bool"
+                },
+                {
+                    "name": "si8",
+                    "type": "int8"
+                },
+                {
+                    "name": "si16",
+                    "type": "int16"
+                },
+                {
+                    "name": "si32",
+                    "type": "int32"
+                },
+                {
+                    "name": "si64",
+                    "type": "int64"
+                },
+                {
+                    "name": "si128",
+                    "type": "int128"
+                },
+                {
+                    "name": "ui8",
+                    "type": "uint8"
+                },
+                {
+                    "name": "ui16",
+                    "type": "uint16"
+                },
+                {
+                    "name": "ui32",
+                    "type": "uint32"
+                },
+                {
+                    "name": "ui64",
+                    "type": "uint64"
+                },
+                {
+                    "name": "ui128",
+                    "type": "uint128"
+                },
+                {
+                    "name": "vi32",
+                    "type": "varint32"
+                },
+                {
+                    "name": "vui32",
+                    "type": "varuint32"
+                },
+                {
+                    "name": "float32",
+                    "type": "float32"
+                },
+                {
+                    "name": "float64",
+                    "type": "float64"
+                },
+                {
+                    "name": "float128",
+                    "type": "float128"
+                },
+                {
+                    "name": "tp",
+                    "type": "time_point"
+                },
+                {
+                    "name": "tps",
+                    "type": "time_point_sec"
+                },
+                {
+                    "name": "bts",
+                    "type": "block_timestamp_type"
+                },
+                {
+                    "name": "name",
+                    "type": "name"
+                },
+                {
+                    "name": "bytes",
+                    "type": "bytes"
+                },
+                {
+                    "name": "string",
+                    "type": "string"
+                },
+                {
+                    "name": "c160",
+                    "type": "checksum160"
+                },
+                {
+                    "name": "c256",
+                    "type": "checksum256"
+                },
+                {
+                    "name": "c512",
+                    "type": "checksum512"
+                },
+                {
+                    "name": "public_key",
+                    "type": "public_key"
+                },
+                {
+                    "name": "signature",
+                    "type": "signature"
+                },
+                {
+                    "name": "symbol_code",
+                    "type": "symbol_code"
+                },
+                {
+                    "name": "symbol",
+                    "type": "symbol"
+                },
+                {
+                    "name": "asset",
+                    "type": "asset"
+                },
+                {
+                    "name": "extended_asset",
+                    "type": "extended_asset"
+                }
+            ]
+        }
+    ],
+    "actions": [],
+    "tables": []
+}

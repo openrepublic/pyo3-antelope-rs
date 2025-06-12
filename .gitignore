@@ -1,4 +1,5 @@
-.idea
+.hypothesis
+.llmctx
 target
 **/__pycache__
 

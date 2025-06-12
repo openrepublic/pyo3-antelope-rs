@@ -81,5 +81,7 @@ from ._lowlevel import (
 
     builtin_types as builtin_types,
 
-    sign_tx as sign_tx
+    sign_tx as sign_tx,
+
+    TryFromError as TryFromError
 )

@@ -13,19 +13,27 @@
 
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from typing import Any, Type
+from inspect import isclass
+from typing import Any, Type, get_origin
 
-from .meta import (
-    builtin_classes,
-    TypeAlias
-)
+from msgspec import ValidationError
+
+from antelope_rs.meta import builtin_classes
+
+
+_convertible_classes: set[Type[Any]] = set(builtin_classes)
+
+
+def _is_type_alias(tp: Type[Any]) -> bool:
+    from antelope_rs.abi._struct import TypeAlias
+    return isclass(tp) and issubclass(tp, TypeAlias)
 
 
 def enc_hook(obj: Any) -> Any:
     if (
         type(obj) in _convertible_classes
         or
-        issubclass(type(obj), TypeAlias)
+    _is_type_alias(type(obj))
     ):
         return obj.to_builtins()
 
@@ -33,16 +41,22 @@ def enc_hook(obj: Any) -> Any:
         raise NotImplementedError(f"Objects of type {type} are not supported")
 
 
-_convertible_classes: set[Type[Any]] = set(builtin_classes)
+def dec_hook(type_: Type, obj):
+    origin = get_origin(type_) or type_
 
-
-def dec_hook(type: Type, obj: Any) -> Any:
     if (
-        type in _convertible_classes
+        origin in _convertible_classes
         or
-        issubclass(type, TypeAlias)
+        _is_type_alias(origin)
     ):
-        return type.try_from(obj)
+        try:
+            return type_.try_from(obj)
+        except ValidationError as e:
+            pretty = getattr(type_, 'pretty_def_str', None)
+            if callable(pretty):
+                e.add_note(f'While decoding:\n{pretty(indent=1)}')
+            else:
+                e.add_note(f'While decoding {type_!r}')
+            raise
 
-    else:
-        raise NotImplementedError(f"Objects of type {type} are not supported")
+    raise NotImplementedError(f'Objects of type {type_} are not supported')

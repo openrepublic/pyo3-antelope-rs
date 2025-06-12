@@ -15,21 +15,13 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from __future__ import annotations
 
-import json
-import hashlib
+import sys
+import time
+import types
 
-from typing import (
-    Callable,
-    Literal,
-    Type,
-)
+from typing import Type
 from pathlib import Path
 
-from msgspec import (
-    Struct,
-    field,
-    convert,
-)
 from frozendict import frozendict
 
 from antelope_rs._lowlevel import (
@@ -38,202 +30,21 @@ from antelope_rs._lowlevel import (
     ShipABI,
 )
 
-from antelope_rs.codec import dec_hook
-from antelope_rs.meta import (
-    TypeNameStr,
-    FieldNameStr,
-    AntelopeNameStr,
-    BaseTypeNameStr
+from antelope_rs.meta import TypeNameStr
+
+from ._defs import (
+    ABILike as ABILike,
+    ABIResolvedType as ABIResolvedType,
+    VariantDef as VariantDef,
+    StructDef as StructDef,
+    ActionDef as ActionDef,
+    AliasDef as AliasDef,
+    TableDef as TableDef
 )
-from .structs import build_struct_namespace
-
-
-TypeModifier = Literal['optional'] | Literal['extension'] | Literal['array']
-TypeSuffix = Literal['?'] | Literal['$'] | Literal['[]']
-
-
-_suffixes: frozendict[TypeModifier, TypeSuffix] = frozendict({
-    'array': '[]',
-    'optional': '?',
-    'extension': '$',
-})
-
-
-def suffix_for(type_mod: TypeModifier) -> TypeSuffix:
-    return _suffixes[type_mod]
-
-
-class AliasDef(Struct, frozen=True):
-    new_type_name: TypeNameStr
-    type_: TypeNameStr = field(name='type')
-
-
-class VariantDef(Struct, frozen=True):
-    name: TypeNameStr
-    types: list[TypeNameStr]
-
-
-class FieldDef(Struct, frozen=True):
-    name: FieldNameStr
-    type_: TypeNameStr = field(name='type')
-
-
-class StructDef(Struct, frozen=True):
-    name: TypeNameStr
-    fields: list[FieldDef]
-    base: BaseTypeNameStr | None = None
-
-
-class ActionDef(Struct, frozen=True):
-    name: AntelopeNameStr
-    type_: TypeNameStr = field(name='type')
-    ricardian_contract: str
-
-
-class TableDef(Struct, frozen=True):
-    name: AntelopeNameStr
-    key_names: list[FieldNameStr]
-    key_types: list[TypeNameStr]
-    index_type: TypeNameStr
-    type_: TypeNameStr = field(name='type')
-
-
-class ABIResolvedType(Struct, frozen=True):
-    original_name: TypeNameStr
-    resolved_name: TypeNameStr
-    is_std: bool
-    is_alias: bool
-    is_struct: StructDef | None
-    is_variant: VariantDef | None
-    modifiers: list[TypeModifier]
-
-
-# ABI & ShipABI highlevel patching
-
-ABILike = bytes | str | dict | ABI | ShipABI
-
-# classmethods
-def _from_file(cls, p: Path | str):
-    return cls.from_str(
-        Path(p).read_text()
-    )
-
-def _try_from(cls, abi: ABILike):
-    if isinstance(abi, cls):
-        return abi
-
-    if isinstance(abi, bytes):
-        return cls.from_bytes(abi)
-
-    if isinstance(abi, dict):
-        abi = json.dumps(abi)
-
-    if isinstance(abi, str):
-        return cls.from_bytes(abi)
-
-    raise TypeError(
-        f'Wrong type for abi creation expected ABILike but got {type(abi).__name__}'
-    )
-
-
-# properties
-def _types(self) -> list[AliasDef]:
-    return [
-        convert(type_dict, type=AliasDef, dec_hook=dec_hook)
-        for type_dict in self._types
-    ]
-
-def _structs(self) -> list[StructDef]:
-    return [
-        convert(struct_dict, type=StructDef, dec_hook=dec_hook)
-        for struct_dict in self._structs
-    ]
-
-def _variants(self) -> list[VariantDef]:
-    return [
-        convert(variant_dict, type=VariantDef, dec_hook=dec_hook)
-        for variant_dict in self._variants
-    ]
-
-def _actions(self) -> list[VariantDef]:
-    return [
-        convert(action_dict, type=VariantDef, dec_hook=dec_hook)
-        for action_dict in self._actions
-    ]
-
-def _tables(self) -> list[VariantDef]:
-    return [
-        convert(table_dict, type=VariantDef, dec_hook=dec_hook)
-        for table_dict in self._tables
-    ]
-
-# methods
-def _hash(self, *, as_bytes: bool = False) -> str | bytes:
-    '''
-    Get a sha256 of the types definition
-
-    '''
-    h = hashlib.sha256()
-
-    h.update(b'structs')
-    for s in self.structs:
-        h.update(s.name.encode())
-        for f in s.fields:
-            h.update(f.name.encode())
-            h.update(f.type_.encode())
-
-    h.update(b'enums')
-    for e in self.variants:
-        h.update(e.name.encode())
-        for v in e.types:
-            h.update(v.encode())
-
-    h.update(b'aliases')
-    for a in self.types:
-        h.update(a.new_type_name.encode())
-        h.update(a.type_.encode())
-
-    return (
-        h.digest() if as_bytes
-        else h.hexdigest()
-    )
-
-def _resolve_type(self, type_name: str) -> ABIResolvedType:
-    return convert(self.resolve_type_into_dict(str(type_name)), type=ABIResolvedType, dec_hook=dec_hook)
-
-# finally monkey patch ABI & ShipABI
-
-def _apply_to_abi_classes(attr_name: str, fn):
-    setattr(ABI, attr_name, fn)
-    setattr(ShipABI, attr_name, fn)
-
-_class_methods = [
-    ('from_file', _from_file),
-    ('try_from', _try_from)
-]
-
-_properties = [
-    ('types', _types),
-    ('structs', _structs),
-    ('variants', _variants),
-    ('actions', _actions),
-    ('tables', _tables)
-]
-
-_methods = [
-    ('hash', _hash),
-    ('resolve_type', _resolve_type),
-]
-
-for name, fn in _class_methods:
-    _apply_to_abi_classes(name, classmethod(fn))
-
-for name, fn in _properties:
-    _apply_to_abi_classes(name, property(fn))
-
-for name, fn in _methods:
-    _apply_to_abi_classes(name, fn)
-
+from ._struct_ns import (
+    build_struct_namespace
+)
+from ._validation import validate_definition
 
 # ABIView:
 # Wraps ABI or ShipABI to provide a unified & fast API into the type namespace
@@ -244,22 +55,24 @@ ABIClassOrAlias = ABIClass | str | None
 
 
 def _solve_cls_alias(cls: ABIClassOrAlias = None) -> ABIClass:
+    if cls is None:
+        return ABI
+
     if isinstance(cls, str):
         if cls in ['std', 'standard']:
             return ShipABI
 
         return ABI
 
-    ret: ABIClass = cls if cls else ABI
     if not (
-        isinstance(ret, ABI)
+        isinstance(cls, ABI)
         and
-        isinstance(ret, ShipABI)
+        isinstance(cls, ShipABI)
     ):
         cls_str = 'None' if not cls else cls.__name__
         raise TypeError(f'Unknown class to init ABIView: {cls_str}')
 
-    return ret
+    return cls
 
 
 class ABIViewMeta(type):
@@ -276,12 +89,15 @@ class ABIViewMeta(type):
     struct_map: frozendict[TypeNameStr, StructDef]
     valid_types: frozenset[TypeNameStr]
 
-    def __new__(mcls, name, bases, ns, *, definition=None, **kw):
+    def __new__(mcls, name, bases, ns, *, definition=None, **kw) -> Type[ABIView]:
         cls = super().__new__(mcls, name, bases, ns, **kw)
 
         # Base ABIView itself has no definition - skip the heavy lifting
         if definition is None:
             return cls
+
+        # validate
+        validate_definition(definition)
 
         # build metadata
         cls._def = definition  # raw Rust object
@@ -296,6 +112,11 @@ class ABIViewMeta(type):
             *cls.alias_map, *cls.struct_map, *cls.variant_map
         ])
 
+        # give each ABIView a unique module name
+        mod_name = f'antelope_rs.abi._view_{name}_{int(time.time())}'
+        mod = types.ModuleType(mod_name)
+        sys.modules[mod_name] = mod
+
         # Re-use the existing helper to autogenerate Python structs/aliases
         tmp_view = object.__new__(ABIView)
         tmp_view._def = definition
@@ -305,7 +126,7 @@ class ABIViewMeta(type):
         tmp_view.valid_types = cls.valid_types
         tmp_view.resolve_type = definition.resolve_type
 
-        for k, v in build_struct_namespace(tmp_view).items():
+        for k, v in build_struct_namespace(tmp_view, mod).items():
             setattr(cls, str(k), v)
 
         return cls
@@ -324,7 +145,7 @@ class ABIView(metaclass=ABIViewMeta):
         *,
         cls_alias: ABIClassOrAlias = None,
         name: str | None = None,
-    ):
+    ) -> Type[ABIView]:
         '''
         Read JSON, decide ABI vs ShipABI, and *return a **new subclass*** that
         carries the parsed definition.
@@ -383,8 +204,3 @@ class ABIView(metaclass=ABIViewMeta):
     @classmethod
     def unpack(cls, *a, **kw):
         return cls._def.unpack(*a, **kw)
-
-    # testing helpers added if antelope_rs.testing imported
-    make_canonical: Callable 
-    canonical_diff: Callable
-    assert_deep_eq: Callable
