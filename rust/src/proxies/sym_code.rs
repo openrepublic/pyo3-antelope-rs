@@ -15,7 +15,7 @@ pub struct PySymbolCode {
 
 #[derive(Debug, Clone, FromPyObject)]
 pub enum SymCodeLike {
-    Raw([u8; 8]),
+    Raw(Vec<u8>),
     Str(String),
     Int(u64),
     Cls(PySymbolCode),

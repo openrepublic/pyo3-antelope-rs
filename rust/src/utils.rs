@@ -1,5 +1,4 @@
 use base64::{engine::general_purpose, Engine as _};
-use hex;
 use pyo3::PyResult;
 
 

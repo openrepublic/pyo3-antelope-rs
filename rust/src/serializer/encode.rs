@@ -5,7 +5,7 @@ use base64::prelude::*;
 use antelope::{
     chain::{
         abi::{
-            ABIResolveError, ABIResolvedType, ABITypeResolver, ABIView, AbiVariant, TypeModifier, BUILTIN_TYPES,
+            ABIResolveError, ABIResolvedType, ABITypeResolver, ABIView, AbiVariant, TypeModifier,
         }, asset::{Asset, ExtendedAsset, Symbol, SymbolCode}, checksum::{Checksum160, Checksum256, Checksum512}, key_type::KeyType, name::Name, public_key::PublicKey, signature::Signature, time::{BlockTimestamp, TimePoint, TimePointSec}, varint::{VarInt32, VarUint32}
     },
     serializer::{Encoder, Packer},

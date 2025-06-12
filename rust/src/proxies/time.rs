@@ -19,7 +19,7 @@ pub struct PyTimePoint {
 
 #[derive(FromPyObject)]
 pub enum TimePointLike {
-    Raw([u8; 8]),
+    Raw(Vec<u8>),
     Int(u64),
     Str(String),
     Cls(PyTimePoint),
@@ -40,8 +40,8 @@ impl From<TimePoint> for PyTimePoint {
 #[pymethods]
 impl PyTimePoint {
     #[staticmethod]
-    pub fn from_bytes(buffer: [u8; 8]) -> PyResult<Self> {
-        let mut decoder = Decoder::new(&buffer);
+    pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
+        let mut decoder = Decoder::new(buffer);
         let mut inner: TimePoint = Default::default();
         decoder
             .unpack(&mut inner)
@@ -68,7 +68,7 @@ impl PyTimePoint {
         value: TimePointLike
     ) -> PyResult<PyTimePoint> {
         match value {
-            TimePointLike::Raw(data) => PyTimePoint::from_bytes(data),
+            TimePointLike::Raw(data) => PyTimePoint::from_bytes(&data),
             TimePointLike::Int(num) => Ok(PyTimePoint::from_int(num)),
             TimePointLike::Str(s) => PyTimePoint::from_str_py(&s),
             TimePointLike::Cls(sum) => Ok(sum),
@@ -119,7 +119,7 @@ pub struct PyTimePointSec {
 
 #[derive(FromPyObject)]
 pub enum TimePointSecLike {
-    Raw([u8; 4]),
+    Raw(Vec<u8>),
     Int(u32),
     Str(String),
     Cls(PyTimePointSec),
@@ -140,8 +140,8 @@ impl From<TimePointSec> for PyTimePointSec {
 #[pymethods]
 impl PyTimePointSec {
     #[staticmethod]
-    pub fn from_bytes(buffer: [u8; 4]) -> PyResult<Self> {
-        let mut decoder = Decoder::new(&buffer);
+    pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
+        let mut decoder = Decoder::new(buffer);
         let mut inner: TimePointSec = Default::default();
         decoder
             .unpack(&mut inner)
@@ -168,7 +168,7 @@ impl PyTimePointSec {
         value: TimePointSecLike
     ) -> PyResult<PyTimePointSec> {
         match value {
-            TimePointSecLike::Raw(data) => PyTimePointSec::from_bytes(data),
+            TimePointSecLike::Raw(data) => PyTimePointSec::from_bytes(&data),
             TimePointSecLike::Int(num) => Ok(PyTimePointSec::from_int(num)),
             TimePointSecLike::Str(s) => PyTimePointSec::from_str_py(&s),
             TimePointSecLike::Cls(sum) => Ok(sum),
@@ -219,7 +219,7 @@ pub struct PyBlockTimestamp {
 
 #[derive(FromPyObject)]
 pub enum BlockTimestampLike {
-    Raw([u8; 4]),
+    Raw(Vec<u8>),
     Int(u32),
     Str(String),
     Cls(PyBlockTimestamp),
@@ -240,8 +240,8 @@ impl From<BlockTimestamp> for PyBlockTimestamp {
 #[pymethods]
 impl PyBlockTimestamp {
     #[staticmethod]
-    pub fn from_bytes(buffer: [u8; 4]) -> PyResult<Self> {
-        let mut decoder = Decoder::new(&buffer);
+    pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
+        let mut decoder = Decoder::new(buffer);
         let mut inner: BlockTimestamp = Default::default();
         decoder
             .unpack(&mut inner)
@@ -268,7 +268,7 @@ impl PyBlockTimestamp {
         value: BlockTimestampLike
     ) -> PyResult<PyBlockTimestamp> {
         match value {
-            BlockTimestampLike::Raw(data) => PyBlockTimestamp::from_bytes(data),
+            BlockTimestampLike::Raw(data) => PyBlockTimestamp::from_bytes(&data),
             BlockTimestampLike::Int(num) => Ok(PyBlockTimestamp::from_int(num)),
             BlockTimestampLike::Str(s) => PyBlockTimestamp::from_str_py(&s),
             BlockTimestampLike::Cls(sum) => Ok(sum),

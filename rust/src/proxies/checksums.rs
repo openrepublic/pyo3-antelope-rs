@@ -1,8 +1,6 @@
 use std::fmt::Display;
 
-use antelope::chain::checksum::{
-    Checksum160, Checksum256, Checksum512,
-};
+use antelope::chain::checksum::{Checksum160, Checksum256, Checksum512};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -10,272 +8,97 @@ use pyo3::types::{PyString, PyType};
 
 use crate::utils::try_decode_string_bytes;
 
-#[pyclass(frozen, name = "Checksum160")]
-#[derive(Debug, Clone)]
-pub struct PyChecksum160 {
-    pub inner: Checksum160,
+
+/// Generate Python‑facing checksum wrappers with PyO3.
+///
+/// Each tuple argument expands to a complete wrapper:
+/// `(WrapperIdent, "PythonName", LikeEnumIdent, NativeIdent, BYTES)`
+macro_rules! define_checksum_py {
+    ($(($wrapper:ident, $py_name:literal, $like:ident, $native:ident, $len:expr)),+ $(,)?) => {
+        $(
+            #[pyclass(frozen, name = $py_name)]
+            #[derive(Debug, Clone)]
+            pub struct $wrapper {
+                pub inner: $native,
+            }
+
+            #[derive(FromPyObject)]
+            pub enum $like {
+                Raw(Vec<u8>),
+                Str(String),
+                Cls($wrapper),
+            }
+
+            impl From<$wrapper> for $native {
+                fn from(value: $wrapper) -> Self { value.inner }
+            }
+
+            impl From<$native> for $wrapper {
+                fn from(value: $native) -> Self { Self { inner: value } }
+            }
+
+            #[pymethods]
+            impl $wrapper {
+                #[staticmethod]
+                pub fn from_bytes(data: &[u8]) -> PyResult<Self> {
+                    if data.len() < $len {
+                        return Err(PyValueError::new_err(format!(
+                            "Expected at least {0} bytes, got {1}", $len, data.len()
+                        )));
+                    }
+                    Ok($native { data: data[..$len].try_into().expect("slice len verified") }.into())
+                }
+
+                #[staticmethod]
+                #[pyo3(name = "from_str")]
+                pub fn from_str_py(s: &str) -> PyResult<Self> {
+                    let bytes = try_decode_string_bytes(s, Some($len))?;
+                    Self::from_bytes(&bytes)
+                }
+
+                #[classmethod]
+                pub fn try_from<'py>(_cls: &Bound<'py, PyType>, value: $like) -> PyResult<Self> {
+                    match value {
+                        $like::Raw(d) => Self::from_bytes(&d),
+                        $like::Str(s) => Self::from_str_py(&s),
+                        $like::Cls(c) => Ok(c),
+                    }
+                }
+
+                #[classmethod]
+                pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
+                    cls.name()
+                }
+
+                pub fn to_builtins(&self) -> &[u8; $len] { &self.inner.data }
+                pub fn encode(&self) -> &[u8; $len]     { &self.inner.data }
+
+                fn __str__(&self) -> String { self.inner.to_string() }
+
+                fn __richcmp__(&self, other: PyRef<$wrapper>, op: CompareOp) -> PyResult<bool> {
+                    let rhs = &(*other).inner; // deref PyRef to access the wrapped struct
+                    Ok(match op {
+                        CompareOp::Eq => self.inner == *rhs,
+                        CompareOp::Ne => self.inner != *rhs,
+                        _ => return Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                            "Operation not implemented",
+                        )),
+                    })
+                }
+            }
+
+            impl Display for $wrapper {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{}", self.inner)
+                }
+            }
+        )+
+    };
 }
 
-#[derive(FromPyObject)]
-pub enum Sum160Like {
-    Raw([u8; 20]),
-    Str(String),
-    Cls(PyChecksum160),
-}
 
-impl From<PyChecksum160> for Checksum160 {
-    fn from(value: PyChecksum160) -> Self {
-        value.inner
-    }
-}
-
-impl From<Checksum160> for PyChecksum160 {
-    fn from(value: Checksum160) -> Self {
-        PyChecksum160 { inner: value }
-    }
-}
-
-#[pymethods]
-impl PyChecksum160 {
-    #[staticmethod]
-    pub fn from_bytes(data: [u8; 20]) -> PyResult<Self> {
-        Ok(Checksum160 { data }.into())
-    }
-
-    #[staticmethod]
-    #[pyo3(name = "from_str")]
-    pub fn from_str_py(s: &str) -> PyResult<Self> {
-        let bytes = <[u8; 20]>::try_from(
-            try_decode_string_bytes(s, Some(20))?
-        ).map_err(|b|
-            PyValueError::new_err(format!("Input must be decodable as 20 bytes, but got {}", b.len()))
-        )?;
-
-        Self::from_bytes(bytes)
-    }
-
-    #[classmethod]
-    pub fn try_from<'py>(
-        _cls: &Bound<'py, PyType>,
-        value: Sum160Like
-    ) -> PyResult<PyChecksum160> {
-        match value {
-            Sum160Like::Raw(data) => PyChecksum160::from_bytes(data),
-            Sum160Like::Str(s) => PyChecksum160::from_str_py(&s),
-            Sum160Like::Cls(sum) => Ok(sum),
-        }
-    }
-
-    #[classmethod]
-    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
-        cls.name()
-    }
-
-    pub fn to_builtins(&self) -> &[u8; 20] {
-        &self.inner.data
-    }
-
-    pub fn encode(&self) -> &[u8; 20] {
-        &self.inner.data
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
-
-    fn __richcmp__(&self, other: PyRef<PyChecksum160>, op: CompareOp) -> PyResult<bool> {
-        match op {
-            CompareOp::Eq => Ok(self.inner == other.inner),
-            CompareOp::Ne => Ok(self.inner != other.inner),
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "Operation not implemented",
-            )),
-        }
-    }
-}
-
-impl Display for PyChecksum160 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner)
-    }
-}
-
-#[pyclass(frozen, name = "Checksum256")]
-#[derive(Debug, Clone)]
-pub struct PyChecksum256 {
-    pub inner: Checksum256,
-}
-
-#[derive(FromPyObject)]
-pub enum Sum256Like {
-    Raw([u8; 32]),
-    Str(String),
-    Cls(PyChecksum256),
-}
-
-impl From<PyChecksum256> for Checksum256 {
-    fn from(value: PyChecksum256) -> Self {
-        value.inner
-    }
-}
-
-impl From<Checksum256> for PyChecksum256 {
-    fn from(value: Checksum256) -> Self {
-        PyChecksum256 { inner: value }
-    }
-}
-
-#[pymethods]
-impl PyChecksum256 {
-    #[staticmethod]
-    pub fn from_bytes(data: [u8; 32]) -> PyResult<Self> {
-        Ok(Checksum256 { data }.into())
-    }
-
-    #[staticmethod]
-    #[pyo3(name = "from_str")]
-    pub fn from_str_py(s: &str) -> PyResult<Self> {
-        let bytes = <[u8; 32]>::try_from(
-            try_decode_string_bytes(s, Some(32))?
-        ).map_err(|b|
-            PyValueError::new_err(format!("Input must be decodable as 20 bytes, but got {}", b.len()))
-        )?;
-
-        Self::from_bytes(bytes)
-    }
-
-    #[classmethod]
-    pub fn try_from<'py>(
-        _cls: &Bound<'py, PyType>,
-        value: Sum256Like
-    ) -> PyResult<PyChecksum256> {
-        match value {
-            Sum256Like::Raw(data) => PyChecksum256::from_bytes(data),
-            Sum256Like::Str(s) => PyChecksum256::from_str_py(&s),
-            Sum256Like::Cls(sum) => Ok(sum),
-        }
-    }
-
-    #[classmethod]
-    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
-        cls.name()
-    }
-
-    pub fn to_builtins(&self) -> &[u8; 32] {
-        &self.inner.data
-    }
-
-    pub fn encode(&self) -> &[u8; 32] {
-        &self.inner.data
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
-
-    fn __richcmp__(&self, other: PyRef<PyChecksum256>, op: CompareOp) -> PyResult<bool> {
-        match op {
-            CompareOp::Eq => Ok(self.inner == other.inner),
-            CompareOp::Ne => Ok(self.inner != other.inner),
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "Operation not implemented",
-            )),
-        }
-    }
-}
-
-impl Display for PyChecksum256 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner)
-    }
-}
-
-#[pyclass(frozen, name = "Checksum512")]
-#[derive(Debug, Clone)]
-pub struct PyChecksum512 {
-    pub inner: Checksum512,
-}
-
-#[derive(FromPyObject)]
-pub enum Sum512Like {
-    Raw([u8; 64]),
-    Str(String),
-    Cls(PyChecksum512),
-}
-
-impl From<PyChecksum512> for Checksum512 {
-    fn from(value: PyChecksum512) -> Self {
-        value.inner
-    }
-}
-
-impl From<Checksum512> for PyChecksum512 {
-    fn from(value: Checksum512) -> Self {
-        PyChecksum512 { inner: value }
-    }
-}
-
-#[pymethods]
-impl PyChecksum512 {
-    #[staticmethod]
-    pub fn from_bytes(data: [u8; 64]) -> PyResult<Self> {
-        Ok(Checksum512 { data }.into())
-    }
-
-    #[staticmethod]
-    #[pyo3(name = "from_str")]
-    pub fn from_str_py(s: &str) -> PyResult<Self> {
-        let bytes = <[u8; 64]>::try_from(
-            try_decode_string_bytes(s, Some(64))?
-        ).map_err(|b|
-            PyValueError::new_err(format!("Input must be decodable as 20 bytes, but got {}", b.len()))
-        )?;
-
-        Self::from_bytes(bytes)
-    }
-
-    #[classmethod]
-    pub fn try_from<'py>(
-        _cls: &Bound<'py, PyType>,
-        value: Sum512Like
-    ) -> PyResult<PyChecksum512> {
-        match value {
-            Sum512Like::Raw(data) => PyChecksum512::from_bytes(data),
-            Sum512Like::Str(s) => PyChecksum512::from_str_py(&s),
-            Sum512Like::Cls(sum) => Ok(sum),
-        }
-    }
-
-    #[classmethod]
-    pub fn pretty_def_str<'py>(cls: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyString>> {
-        cls.name()
-    }
-
-    pub fn to_builtins(&self) -> &[u8; 64] {
-        &self.inner.data
-    }
-
-    pub fn encode(&self) -> &[u8; 64] {
-        &self.inner.data
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
-
-    fn __richcmp__(&self, other: PyRef<PyChecksum512>, op: CompareOp) -> PyResult<bool> {
-        match op {
-            CompareOp::Eq => Ok(self.inner == other.inner),
-            CompareOp::Ne => Ok(self.inner != other.inner),
-            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "Operation not implemented",
-            )),
-        }
-    }
-}
-
-impl Display for PyChecksum512 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner)
-    }
-}
+define_checksum_py!(
+    (PyChecksum160, "Checksum160", Sum160Like, Checksum160, 20),
+    (PyChecksum256, "Checksum256", Sum256Like, Checksum256, 32),
+    (PyChecksum512, "Checksum512", Sum512Like, Checksum512, 64),
+);

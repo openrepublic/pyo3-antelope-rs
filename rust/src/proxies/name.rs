@@ -23,7 +23,7 @@ impl Hash for PyName {
 #[derive(FromPyObject)]
 pub enum NameLike {
     Num(u64),
-    Raw([u8; 8]),
+    Raw(Vec<u8>),
     Str(String),
     Cls(PyName),
 }

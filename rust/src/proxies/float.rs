@@ -18,7 +18,7 @@ pub struct PyFloat128 {
 
 #[derive(FromPyObject)]
 pub enum Float128Like<'py> {
-    Raw([u8; 16]),
+    Raw(Vec<u8>),
     Str(String),
     Float(Bound<'py, PyFloat>),
     Cls(PyFloat128),
@@ -39,8 +39,8 @@ impl From<Float128> for PyFloat128 {
 #[pymethods]
 impl PyFloat128 {
     #[staticmethod]
-    pub fn from_bytes(buffer: [u8; 16]) -> PyResult<Self> {
-        let mut decoder = Decoder::new(&buffer);
+    pub fn from_bytes(buffer: &[u8]) -> PyResult<Self> {
+        let mut decoder = Decoder::new(buffer);
         let mut inner: Float128 = Default::default();
         decoder
             .unpack(&mut inner)
@@ -62,7 +62,7 @@ impl PyFloat128 {
         value: Float128Like
     ) -> PyResult<PyFloat128> {
         match value {
-            Float128Like::Raw(data) => PyFloat128::from_bytes(data),
+            Float128Like::Raw(data) => PyFloat128::from_bytes(&data),
             Float128Like::Str(s) => PyFloat128::from_str_py(&s),
             Float128Like::Float(py_float) => PyFloat128::from_str_py(&py_float.to_string()),
             Float128Like::Cls(sum) => Ok(sum),

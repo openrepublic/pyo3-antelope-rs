@@ -21,7 +21,7 @@ pub struct PyAsset {
 
 #[derive(FromPyObject)]
 pub enum AssetLike<'py> {
-    Raw([u8; 16]),
+    Raw(Vec<u8>),
     Str(String),
     Int(i64, SymLike),
     Decimal(Decimal, SymLike),
@@ -218,7 +218,7 @@ pub struct PyExtendedAsset {
 
 #[derive(FromPyObject)]
 pub enum ExtAssetLike<'py> {
-    Raw([u8; 24]),
+    Raw(Vec<u8>),
     Str(String),
     Dict(Bound<'py, PyDict>),
     Cls(PyExtendedAsset),
