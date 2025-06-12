@@ -1,5 +1,4 @@
 use std::fmt::Display;
-use std::str::FromStr;
 
 use antelope::chain::checksum::{
     Checksum160, Checksum256, Checksum512,
@@ -8,6 +7,8 @@ use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyString, PyType};
+
+use crate::utils::try_decode_string_bytes;
 
 #[pyclass(frozen, name = "Checksum160")]
 #[derive(Debug, Clone)]
@@ -44,9 +45,13 @@ impl PyChecksum160 {
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        Checksum160::from_str(s)
-            .map(|sum| sum.into())
-            .map_err(|err| PyValueError::new_err(err.to_string()))
+        let bytes = <[u8; 20]>::try_from(
+            try_decode_string_bytes(s, Some(20))?
+        ).map_err(|b|
+            PyValueError::new_err(format!("Input must be decodable as 20 bytes, but got {}", b.len()))
+        )?;
+
+        Self::from_bytes(bytes)
     }
 
     #[classmethod]
@@ -130,9 +135,13 @@ impl PyChecksum256 {
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        Checksum256::from_str(s)
-            .map(|sum| sum.into())
-            .map_err(|err| PyValueError::new_err(err.to_string()))
+        let bytes = <[u8; 32]>::try_from(
+            try_decode_string_bytes(s, Some(32))?
+        ).map_err(|b|
+            PyValueError::new_err(format!("Input must be decodable as 20 bytes, but got {}", b.len()))
+        )?;
+
+        Self::from_bytes(bytes)
     }
 
     #[classmethod]
@@ -216,9 +225,13 @@ impl PyChecksum512 {
     #[staticmethod]
     #[pyo3(name = "from_str")]
     pub fn from_str_py(s: &str) -> PyResult<Self> {
-        Checksum512::from_str(s)
-            .map(|sum| sum.into())
-            .map_err(|err| PyValueError::new_err(err.to_string()))
+        let bytes = <[u8; 64]>::try_from(
+            try_decode_string_bytes(s, Some(64))?
+        ).map_err(|b|
+            PyValueError::new_err(format!("Input must be decodable as 20 bytes, but got {}", b.len()))
+        )?;
+
+        Self::from_bytes(bytes)
     }
 
     #[classmethod]

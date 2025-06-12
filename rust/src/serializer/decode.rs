@@ -179,7 +179,7 @@ where
         path.pop();
 
         if let Ok(dict) = payload.downcast::<PyDict>() {
-            dict.set_item("type", inner_type_name)?;
+            dict.set_item("antelope_type", inner_type_name)?;
             return dict.into_bound_py_any(py);
         }
         return Ok(payload);

@@ -1,10 +1,11 @@
 use antelope::chain::signature::Signature;
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyString, PyType};
 use std::str::FromStr;
+
+use super::TryFromError;
 
 #[pyclass(frozen, name = "Signature")]
 #[derive(Debug, Clone)]
@@ -39,7 +40,7 @@ impl PySignature {
         let mut inner: Signature = Default::default();
         decoder
             .unpack(&mut inner)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            .map_err(|e| TryFromError::new_err(e.to_string()))?;
         Ok(inner.into())
     }
 
@@ -48,7 +49,7 @@ impl PySignature {
     pub fn from_str_py(s: &str) -> PyResult<Self> {
         Signature::from_str(s)
             .map(|s| s.into())
-            .map_err(PyValueError::new_err)
+            .map_err(TryFromError::new_err)
     }
 
     #[classmethod]

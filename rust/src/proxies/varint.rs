@@ -89,6 +89,11 @@ impl PyVarUInt32 {
         encoder.get_bytes().to_vec()
     }
 
+    #[getter]
+    fn encode_length(&self) -> usize {
+        self.inner.size()
+    }
+
     fn __int__(&self) -> u32 {
         self.inner.n
     }

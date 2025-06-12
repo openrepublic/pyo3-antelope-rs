@@ -14,9 +14,11 @@ use antelope::chain::abi::BUILTIN_TYPES;
 use proxies::float::PyFloat128;
 use proxies::time::{PyBlockTimestamp, PyTimePoint, PyTimePointSec};
 use proxies::varint::{PyVarInt32, PyVarUInt32};
+use proxies::TryFromError;
 use pyo3::panic::PanicException;
 use pyo3::prelude::*;
 use pyo3::types::{PyFrozenSet, PyInt};
+use utils::BytesStringDecodeError;
 
 #[pymodule(name = "_lowlevel")]
 fn antelope_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -61,6 +63,8 @@ fn antelope_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyShipABI>()?;
 
     m.add("PanicException", py.get_type::<PanicException>())?;
+    m.add("TryFromError", py.get_type::<TryFromError>())?;
+    m.add("BytesStringDecodeError", py.get_type::<BytesStringDecodeError>())?;
 
     Ok(())
 }

@@ -7,9 +7,14 @@ edition = "2021"
 name = "_lowlevel"
 crate-type = ["cdylib"]
 
+[profile.release-with-debug]
+inherits = "release"
+debug = "line-tables-only"
+strip = "none"
+
 [dependencies]
 pyo3 = { version = "0.25.0", features = ["extension-module", "abi3-py39", "rust_decimal"]}
-antelope-client = { git = "https://github.com/openrepublic/antelope-rs.git", rev = "d0bcf3a8fb187aee48b7b3450a8daaa4a6469fcf" }
+antelope-client = { git = "https://github.com/openrepublic/antelope-rs.git", rev = "60257c660aae298500edd74270144e9632288cf3" }
 # antelope-client = { path = "../../antelope-rs/crates/antelope" }
 chrono = "0.4.39"
 pyo3-log = "0.12.1"
@@ -17,3 +22,5 @@ rust_decimal = "1.36.0"
 serde_json = "1.0.140"
 serde = "1.0.219"
 thiserror = "2.0.12"
+hex = "0.4.3"
+base64 = "0.22.1"

@@ -46,11 +46,11 @@ dependencies = [
 [[package]]
 name = "antelope-client"
 version = "0.4.0"
-source = "git+https://github.com/openrepublic/antelope-rs.git?rev=d0bcf3a8fb187aee48b7b3450a8daaa4a6469fcf#d0bcf3a8fb187aee48b7b3450a8daaa4a6469fcf"
+source = "git+https://github.com/openrepublic/antelope-rs.git?rev=60257c660aae298500edd74270144e9632288cf3#60257c660aae298500edd74270144e9632288cf3"
 dependencies = [
  "antelope-client-macros",
  "async-trait",
- "base64",
+ "base64 0.21.7",
  "bs58",
  "chrono",
  "digest",
@@ -80,7 +80,7 @@ dependencies = [
 [[package]]
 name = "antelope-client-macros"
 version = "0.2.0"
-source = "git+https://github.com/openrepublic/antelope-rs.git?rev=d0bcf3a8fb187aee48b7b3450a8daaa4a6469fcf#d0bcf3a8fb187aee48b7b3450a8daaa4a6469fcf"
+source = "git+https://github.com/openrepublic/antelope-rs.git?rev=60257c660aae298500edd74270144e9632288cf3#60257c660aae298500edd74270144e9632288cf3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -142,6 +142,12 @@ name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
+
+[[package]]
+name = "base64"
+version = "0.22.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "base64ct"
@@ -1330,7 +1336,9 @@ name = "pyo3-antelope-rs"
 version = "1.3.1"
 dependencies = [
  "antelope-client",
+ "base64 0.22.1",
  "chrono",
+ "hex",
  "pyo3",
  "pyo3-log",
  "rust_decimal",
@@ -1470,7 +1478,7 @@ version = "0.11.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd67538700a17451e7cba03ac727fb961abb7607553461627b97de0b89cf4a62"
 dependencies = [
- "base64",
+ "base64 0.21.7",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -1593,7 +1601,7 @@ version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c74cae0a4cf6ccbbf5f359f08efdf8ee7e1dc532573bf0db71968cb56b1448c"
 dependencies = [
- "base64",
+ "base64 0.21.7",
 ]
 
 [[package]]

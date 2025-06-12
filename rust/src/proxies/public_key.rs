@@ -2,11 +2,12 @@ use crate::proxies::private_key::PyPrivateKey;
 use antelope::chain::public_key::PublicKey;
 use antelope::serializer::{Decoder, Encoder, Packer};
 use pyo3::basic::CompareOp;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyString, PyType};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::str::FromStr;
+
+use super::TryFromError;
 
 #[pyclass(frozen, name = "PublicKey")]
 #[derive(Debug, Clone)]
@@ -41,7 +42,7 @@ impl PyPublicKey {
         let mut inner: PublicKey = Default::default();
         decoder
             .unpack(&mut inner)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            .map_err(|e| TryFromError::new_err(e.to_string()))?;
         Ok(inner.into())
     }
 
@@ -50,13 +51,13 @@ impl PyPublicKey {
     pub fn from_str_py(s: &str) -> PyResult<Self> {
         PublicKey::from_str(s)
             .map(|k| k.into())
-            .map_err(|e| PyValueError::new_err(e.to_string()))
+            .map_err(|e| TryFromError::new_err(e.to_string()))
     }
 
     #[staticmethod]
     pub fn from_priv(p: &PyPrivateKey) -> PyResult<Self> {
         p.inner.to_public().map(|k| k.into()).map_err(|e| {
-            PyValueError::new_err(format!(
+            TryFromError::new_err(format!(
                 "Error while extracting public key from private: {e}"
             ))
         })

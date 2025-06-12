@@ -147,8 +147,8 @@ macro_rules! define_pyabi {
 
                 dict.set_item("original_name", res.original_name)?;
                 dict.set_item("resolved_name", res.resolved_name)?;
+                dict.set_item("alias_chain", res.alias_chain)?;
                 dict.set_item("is_std", res.is_std)?;
-                dict.set_item("is_alias", res.is_alias)?;
                 dict.set_item("is_variant", is_variant)?;
                 dict.set_item("is_struct", is_struct)?;
                 dict.set_item(

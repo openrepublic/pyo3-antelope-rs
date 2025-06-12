@@ -323,6 +323,16 @@ impl PyExtendedAsset {
         self.inner.to_string()
     }
 
+    fn __richcmp__(&self, other: PyRef<PyExtendedAsset>, op: CompareOp) -> PyResult<bool> {
+        match op {
+            CompareOp::Eq => Ok(self.inner == other.inner),
+            CompareOp::Ne => Ok(self.inner != other.inner),
+            _ => Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                "Operation not implemented",
+            )),
+        }
+    }
+
     fn __add__(&self, other: &PyExtendedAsset) -> PyResult<PyExtendedAsset> {
         let result = self
             .inner

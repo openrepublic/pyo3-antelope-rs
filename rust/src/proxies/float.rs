@@ -74,8 +74,8 @@ impl PyFloat128 {
         cls.name()
     }
 
-    pub fn to_builtins(&self) -> String {
-        self.to_string()
+    pub fn to_builtins(&self) -> [u8; 16] {
+        u128::from_le_bytes(self.inner.f.into_inner()).to_le_bytes()
     }
 
     pub fn encode(&self) -> Vec<u8> {

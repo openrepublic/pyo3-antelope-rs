@@ -10,3 +10,5 @@ pub mod sym_code;
 pub mod time;
 pub mod varint;
 pub mod float;
+
+pyo3::create_exception!(_lowlevel, TryFromError, pyo3::exceptions::PyException);

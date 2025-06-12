@@ -1,10 +1,12 @@
-use std::str::FromStr;
+use std::{backtrace::Backtrace, str::FromStr};
+use hex;
+use base64::prelude::*;
 
 use antelope::{
     chain::{
         abi::{
-            ABIResolveError, ABIResolvedType, ABITypeResolver, ABIView, AbiVariant, TypeModifier,
-        }, asset::{Asset, ExtendedAsset, Symbol, SymbolCode}, checksum::{Checksum160, Checksum256, Checksum512}, float::Float128, key_type::KeyType, name::Name, public_key::PublicKey, signature::Signature, time::{BlockTimestamp, TimePoint, TimePointSec}, varint::{VarInt32, VarUint32}
+            ABIResolveError, ABIResolvedType, ABITypeResolver, ABIView, AbiVariant, TypeModifier, BUILTIN_TYPES,
+        }, asset::{Asset, ExtendedAsset, Symbol, SymbolCode}, checksum::{Checksum160, Checksum256, Checksum512}, key_type::KeyType, name::Name, public_key::PublicKey, signature::Signature, time::{BlockTimestamp, TimePoint, TimePointSec}, varint::{VarInt32, VarUint32}
     },
     serializer::{Encoder, Packer},
 };
@@ -15,20 +17,20 @@ use pyo3::{
 };
 use thiserror::Error;
 
-use crate::proxies::{
-    asset::{PyAsset, PyExtendedAsset},
-    checksums::{
+use crate::{proxies::{
+    asset::{PyAsset, PyExtendedAsset}, checksums::{
         PyChecksum160, PyChecksum256, PyChecksum512,
-    },
-    name::PyName,
-    public_key::PyPublicKey,
-    signature::PySignature,
-    sym::PySymbol,
-    sym_code::PySymbolCode,
-};
+    }, float::PyFloat128, name::PyName, public_key::PyPublicKey, signature::PySignature, sym::PySymbol, sym_code::PySymbolCode
+}, utils::try_decode_string_bytes};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct EncodePath(Vec<String>);
+
+impl Default for EncodePath {
+    fn default() -> Self {
+        EncodePath(vec!["$".to_string()])
+    }
+}
 
 impl EncodePath {
     fn push<S: Into<String>>(&mut self, s: S) {
@@ -92,8 +94,34 @@ pub enum EncodeError {
 
 impl From<EncodeError> for PyErr {
     fn from(e: EncodeError) -> Self {
-        PyValueError::new_err(e.to_string())
+        let bt = Backtrace::force_capture();
+        PyValueError::new_err(format!("{e}\n\nBacktrace:\n{bt}"))
     }
+}
+
+/// Depth-first lookup: does *ty* (possibly a variant-alias) ultimately
+/// contain a struct whose tag matches `wanted_tag`?
+fn variant_arm_matches<ABI>(
+    abi: &ABI,
+    ty: &str,
+    wanted_tag: &str,
+) -> Result<bool, ABIResolveError>
+where
+    ABI: ABITypeResolver,
+{
+    let meta = abi.resolve_type(ty)?;           // flattened → never alias
+
+    if let Some(def) = &meta.is_struct {
+        return Ok(def.name == wanted_tag);
+    }
+    if let Some(var) = &meta.is_variant {
+        for inner in &var.types {
+            if variant_arm_matches(abi, inner, wanted_tag)? {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }
 
 pub fn encode_abi_type<'py, ABI>(
@@ -105,16 +133,11 @@ pub fn encode_abi_type<'py, ABI>(
 where
     ABI: ABIView + ABITypeResolver,
 {
-    let mut meta = abi
-        .resolve_type(type_name)
-        .map_err(|e| EncodeError::Resolve {
-            path: type_name.to_string(),
-            source: e,
-        })?;
-
     let mut path = EncodePath::default();
-    path.push(type_name);
-
+    let mut meta = abi.resolve_type(type_name).map_err(|e| EncodeError::Resolve{
+        path: path.as_str(),
+        source: e
+    })?;
     encode_with_meta(abi, &mut meta, value, encoder, &mut path)
 }
 
@@ -129,33 +152,34 @@ where
     ABI: ABIView + ABITypeResolver,
 {
     if !meta.modifiers.is_empty() {
-        let this_mod = meta.modifiers.remove(0);
-
-        match this_mod {
+        let mut new_meta = meta.clone();
+        new_meta.modifiers.remove(0);
+        match meta.modifiers[0] {
             TypeModifier::Optional => {
                 if value.is_none() {
                     return Ok((0u8).pack(encoder));
                 }
                 let mut size = (1u8).pack(encoder);
-                path.push("some");
-                size += encode_with_meta(abi, meta, value, encoder, path)?;
-                path.pop();
+                size += encode_with_meta(abi, &mut new_meta, value, encoder, path)?;
                 return Ok(size);
             }
 
             TypeModifier::Array => {
-                let seq = value
-                    .downcast::<PyList>()
-                    .map_err(|_| EncodeError::TypeMismatch {
-                        path: path.as_str(),
-                        expected: "list/tuple".into(),
-                    })?;
+                // input must be a list
+                let seq = value.downcast::<PyList>().map_err(|_| EncodeError::TypeMismatch {
+                    path: path.as_str(),
+                    expected: "list/tuple".into(),
+                })?;
 
+                // write length prefix
                 let mut size = VarUint32::from(seq.len()).pack(encoder);
 
+                // encode every element with its own fresh copy
                 for (i, item) in seq.iter().enumerate() {
                     path.push(format!("[{i}]"));
-                    size += encode_with_meta(abi, meta, &item, encoder, path)?;
+
+                    size += encode_with_meta(abi, &mut new_meta, &item, encoder, path)?;
+
                     path.pop();
                 }
                 return Ok(size);
@@ -165,28 +189,27 @@ where
                 if value.is_none() {
                     return Ok(0);
                 }
-                path.push("extension");
-                let sz = encode_with_meta(abi, meta, value, encoder, path)?;
-                path.pop();
+                let sz = encode_with_meta(abi, &mut new_meta, value, encoder, path)?;
                 return Ok(sz);
             }
         }
     }
 
-    if meta.is_std {
-        return encode_std(meta, value, encoder, path);
-    }
-
     if let Some(var_meta) = &meta.is_variant {
         let (idx, sel_ty) = detect_variant(path, abi, var_meta, value)?;
-
         let mut size = VarUint32::from(idx).pack(encoder);
 
-        path.push(format!("variant({idx})"));
-        size += encode_abi_type(abi, &sel_ty, value, encoder)?;
-        path.pop();
+        let mut inner_meta = abi.resolve_type(&sel_ty).map_err(|e| EncodeError::Resolve {
+            path: sel_ty.clone(),
+            source: e,
+        })?;
+        size += encode_with_meta(abi, &mut inner_meta, value, encoder, path)?;
 
         return Ok(size);
+    }
+
+    if meta.is_std {
+        return encode_std(meta, value, encoder, path);
     }
 
     if let Some(struct_def) = &meta.is_struct {
@@ -286,12 +309,34 @@ fn encode_std<'py>(
         }
         "float32" => simple!(f32),
         "float64" => simple!(f64),
+
         "float128" => {
-            let v: [u8; 16] = extract!([u8; 16])?;
-            Ok(Float128::try_from(v.as_slice())
-                .map_err(|e| PyValueError::new_err(e.to_string()))?
-                .pack(encoder))
+            // raw bytes go straight through
+            if let Ok(arr) = value.extract::<[u8; 16]>() {
+                encoder.pack_raw(&arr);
+                return Ok(16);
+            }
+            if let Ok(buf) = value.extract::<Vec<u8>>() {
+                if buf.len() == 16 {
+                    encoder.pack_raw(&buf);
+                    return Ok(16);
+                }
+            }
+
+            // b64 / hex string
+            if let Ok(s) = value.extract::<String>() {
+                let raw = try_decode_string_bytes(&s, Some(16))?;
+                if raw.len() == 16 {
+                    encoder.pack_raw(&raw);
+                    return Ok(16);
+                }
+            }
+
+            // PyFloat128
+            let f = value.extract::<PyFloat128>()?.inner;
+            Ok(f.pack(encoder))
         }
+
         "time_point" => {
             let tp = if let Ok(elapsed) = extract!(u64) {
                 Ok(TimePoint { elapsed })
@@ -367,8 +412,28 @@ fn encode_std<'py>(
             Ok(n.pack(encoder))
         }
         "bytes" => {
-            let v: Vec<u8> = extract!(Vec<u8>)?;
-            Ok(v.pack(encoder))
+            let bytes = if let Ok(v) = extract!(Vec<u8>) {
+                Ok::<Vec<u8>, EncodeError>(v)
+            } else if let Ok(s) = extract!(String) {
+                if let Ok(v) = hex::decode(&s) {
+                    Ok(v)
+                } else {
+                    BASE64_STANDARD.decode(&s)
+                        .map_err(|_| EncodeError::ExtractError {
+                            type_name: "bytes".to_string(),
+                            path: path.as_str(),
+                            value: value.to_string()
+                        })
+                }
+            } else {
+                Err(EncodeError::ExtractError {
+                    type_name: "bytes".to_string(),
+                    path: path.as_str(),
+                    value: value.to_string()
+                })
+            }?;
+
+            Ok(bytes.pack(encoder))
         }
         "string" => {
             let s = if let Ok(v) = extract!(String) {
@@ -627,53 +692,73 @@ fn detect_variant<'py>(
 ) -> PyResult<(usize, String)> {
     // struct variant
     if let Ok(d) = value.downcast::<PyDict>() {
-        let tag_py = d.get_item("type")?;
+        let tag_py = d.get_item("antelope_type")?;
         let tag: String = tag_py.extract().map_err(|_| EncodeError::TypeMismatch {
-            path: format!("{}['type']", path.as_str()),
+            path: format!("{}['antelope_type']", path.as_str()),
             expected: "string".into(),
         })?;
 
-        let idx = var_meta
-            .types
-            .iter()
-            .position(|t| **t == tag)
-            .ok_or_else(|| EncodeError::UnknownType {
-                name: var_meta.name.clone(),
-                path: path.as_str(),
-            })?;
+        // walk through aliases / nested variants
+        let mut match_idx = None;
 
-        // everything except "type" is considered the payload; allow both
-        //   {type:'packed_transaction', ...fields }
-        //   {type:'checksum256', value:'abcd…'}
+        for (i, ty) in var_meta.types.iter().enumerate() {
+            if variant_arm_matches(abi, ty, &tag).map_err(|e| EncodeError::Resolve {
+                path: ty.clone(),
+                source: e,
+            })? {
+                if match_idx.is_some() {
+                    // ambiguous tag (two arms match) – safer to bail out
+                    return Err(PyValueError::new_err(format!(
+                        "Ambiguous ABI variant detected {} (tag {tag})",
+                        var_meta.name
+                    )));
+                }
+                match_idx = Some((i, ty.clone()));
+            }
+        }
 
-        return Ok((idx, var_meta.types[idx].clone()));
+        if let Some(res) = match_idx {
+            return Ok(res);
+        }
+
+        return Err(EncodeError::UnknownType {
+            name: tag,
+            path: path.as_str(),
+        }
+        .into());
     }
 
     // std type variant
     let mut candidate = None;
+
     for (idx, ty) in var_meta.types.iter().enumerate() {
         let meta = abi.resolve_type(ty).map_err(|e| EncodeError::Resolve {
             path: ty.to_string(),
             source: e,
         })?;
-        if !meta.is_std {
+
+        // direct std-type match
+        if meta.is_std {
+            if candidate.is_some() {
+                return Err(PyValueError::new_err(format!(
+                    "Ambiguous ABI variant detected {}",
+                    var_meta.name
+                )));
+            }
+            candidate = Some((idx, ty.clone()));
             continue;
-        } // we only auto-detect std types
-
-        if candidate.is_some() {
-            return Err(PyValueError::new_err(format!(
-                "Ambiguous ABI variant detected {}",
-                var_meta.name
-            )));
         }
-        candidate = Some((idx, ty.clone()));
+
+        // nested variant: does *this* arm accept the value?
+        if let Some(inner) = &meta.is_variant {
+            if detect_variant(path, abi, inner, value).is_ok() {
+                // keep the **outer** arm – we still need its tag
+                return Ok((idx, ty.clone()));
+            }
+        }
     }
 
-    if let Some((idx, ty)) = candidate {
-        return Ok((idx, ty));
-    }
-
-    Err(PyTypeError::new_err(format!(
+    candidate.ok_or_else(|| PyTypeError::new_err(format!(
         "Could not detect variant type: {}",
         var_meta.name
     )))
