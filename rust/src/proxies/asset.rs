@@ -145,6 +145,11 @@ impl PyAsset {
     }
 
     #[getter]
+    pub fn encode_length(&self) -> usize {
+        self.inner.size()
+    }
+
+    #[getter]
     pub fn amount(&self) -> i64 {
         self.inner.amount()
     }
@@ -297,6 +302,11 @@ impl PyExtendedAsset {
         let mut encoder = Encoder::new(0);
         self.inner.pack(&mut encoder);
         encoder.get_bytes().to_vec()
+    }
+
+    #[getter]
+    pub fn encode_length(&self) -> usize {
+        self.inner.size()
     }
 
     fn __str__(&self) -> String {

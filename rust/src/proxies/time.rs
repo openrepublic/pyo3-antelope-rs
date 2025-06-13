@@ -85,6 +85,11 @@ impl PyTimePoint {
         encoder.get_bytes().to_vec()
     }
 
+    #[getter]
+    pub fn encode_length(&self) -> usize {
+        8
+    }
+
     fn __str__(&self) -> String {
         self.inner.to_string()
     }
@@ -185,6 +190,11 @@ impl PyTimePointSec {
         encoder.get_bytes().to_vec()
     }
 
+    #[getter]
+    pub fn encode_length(&self) -> usize {
+        4
+    }
+
     fn __str__(&self) -> String {
         self.inner.to_string()
     }
@@ -283,6 +293,11 @@ impl PyBlockTimestamp {
         let mut encoder = Encoder::new(0);
         self.inner.pack(&mut encoder);
         encoder.get_bytes().to_vec()
+    }
+
+    #[getter]
+    pub fn encode_length(&self) -> usize {
+        4
     }
 
     fn __str__(&self) -> String {

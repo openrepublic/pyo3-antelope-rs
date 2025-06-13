@@ -90,6 +90,11 @@ impl PyName {
         encoder.get_bytes().to_vec()
     }
 
+    #[getter]
+    pub fn encode_length(&self) -> usize {
+        8
+    }
+
     pub fn value(&self) -> u64 {
         self.inner.value()
     }

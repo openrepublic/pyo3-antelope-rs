@@ -69,8 +69,18 @@ macro_rules! define_checksum_py {
                     cls.name()
                 }
 
-                pub fn to_builtins(&self) -> &[u8; $len] { &self.inner.data }
-                pub fn encode(&self) -> &[u8; $len]     { &self.inner.data }
+                pub fn to_builtins(&self) -> &[u8; $len] {
+                    &self.inner.data
+                }
+
+                pub fn encode(&self) -> &[u8; $len] {
+                    &self.inner.data
+                }
+
+                #[getter]
+                pub fn encode_length(&self) -> usize {
+                    $len
+                }
 
                 fn __str__(&self) -> String { self.inner.to_string() }
 

@@ -87,6 +87,11 @@ impl PyPublicKey {
         encoder.get_bytes().to_vec()
     }
 
+    #[getter]
+    pub fn encode_length(&self) -> usize {
+        self.inner.size()
+    }
+
     fn __str__(&self) -> String {
         self.inner.to_string()
     }

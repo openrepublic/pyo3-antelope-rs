@@ -74,8 +74,8 @@ impl PySymbol {
         cls.name()
     }
 
-    pub fn to_builtins(&self) -> u64 {
-        self.inner.value()
+    pub fn to_builtins(&self) -> String {
+        self.inner.to_string()
     }
 
     #[getter]
@@ -99,6 +99,11 @@ impl PySymbol {
         let mut encoder = Encoder::new(0);
         self.inner.pack(&mut encoder);
         encoder.get_bytes().to_vec()
+    }
+
+    #[getter]
+    pub fn encode_length(&self) -> usize {
+        8
     }
 
     fn __str__(&self) -> String {

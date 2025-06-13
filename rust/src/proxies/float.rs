@@ -81,6 +81,11 @@ impl PyFloat128 {
         encoder.get_bytes().to_vec()
     }
 
+    #[getter]
+    pub fn encode_length(&self) -> usize {
+        16
+    }
+
     fn __str__(&self) -> String {
         self.inner.to_string()
     }

@@ -71,10 +71,6 @@ impl PyPrivateKey {
         &self.inner.value
     }
 
-    pub fn encode(&self) -> &[u8] {
-        &self.inner.value
-    }
-
     #[staticmethod]
     pub fn random(key_type: u8) -> PyResult<Self> {
         let key_type = KeyType::try_from(key_type)
