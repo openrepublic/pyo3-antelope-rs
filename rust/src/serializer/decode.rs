@@ -30,8 +30,14 @@ use crate::proxies::{
     sym_code::PySymbolCode,
 };
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct DecodePath(Vec<String>);
+
+impl Default for DecodePath {
+    fn default() -> Self {
+        DecodePath(vec!["$".to_string()])
+    }
+}
 
 impl DecodePath {
     fn push<S: Into<String>>(&mut self, seg: S) {
@@ -83,6 +89,7 @@ pub fn decode_abi_type<'py, ABI>(
 where
     ABI: ABIView + ABITypeResolver,
 {
+    let mut path = DecodePath::default();
     let mut meta = abi
         .resolve_type(type_name)
         .map_err(|e| DecodeError::Resolve {
@@ -90,16 +97,13 @@ where
             source: e,
         })?;
 
-    let mut path = DecodePath::default();
-    path.push(type_name);
-
     decode_with_meta(py, abi, &mut meta, decoder, &mut path)
 }
 
 fn decode_with_meta<'py, ABI>(
     py: Python<'py>,
     abi: &ABI,
-    meta: &mut ABIResolvedType,
+    meta: &ABIResolvedType,
     decoder: &mut Decoder<'_>,
     path: &mut DecodePath,
 ) -> PyResult<Bound<'py, PyAny>>
@@ -107,8 +111,9 @@ where
     ABI: ABIView + ABITypeResolver,
 {
     if !meta.modifiers.is_empty() {
-        let this_mod = meta.modifiers.remove(0);
-        match this_mod {
+        let mut new_meta = meta.clone();
+        new_meta.modifiers.remove(0);
+        match meta.modifiers[0] {
             TypeModifier::Optional => {
                 let mut flag: u8 = 0;
                 decoder.unpack(&mut flag).map_err(|e| DecodeError::Unpack {
@@ -120,26 +125,21 @@ where
                 if flag == 0 {
                     return Ok(py.None().into_bound(py));
                 }
-                path.push("some");
-                let res = decode_with_meta(py, abi, meta, decoder, path);
-                path.pop();
-                return res;
+                return decode_with_meta(py, abi, &new_meta, decoder, path);
             }
             TypeModifier::Array => {
                 let mut len_vu: VarUint32 = VarUint32::default();
-                decoder
-                    .unpack(&mut len_vu)
-                    .map_err(|e| DecodeError::Unpack {
-                        what: "array-length".into(),
-                        path: path.as_str(),
-                        err: e.to_string(),
-                    })?;
+                decoder.unpack(&mut len_vu).map_err(|e| DecodeError::Unpack {
+                    what: "array-length".into(),
+                    path: path.as_str(),
+                    err: e.to_string(),
+                })?;
                 let len: usize = len_vu.into();
 
                 let list = PyList::empty(py);
                 for i in 0..len {
                     path.push(format!("[{i}]"));
-                    let item = decode_with_meta(py, abi, meta, decoder, path)?;
+                    let item = decode_with_meta(py, abi, &new_meta, decoder, path)?;
                     list.append(item)?;
                     path.pop();
                 }
@@ -149,10 +149,7 @@ where
                 if decoder.remaining() == 0 {
                     return Ok(py.None().into_bound(py));
                 }
-                path.push("extension");
-                let res = decode_with_meta(py, abi, meta, decoder, path);
-                path.pop();
-                return res;
+                return decode_with_meta(py, abi, &new_meta, decoder, path);
             }
         }
     }
@@ -180,15 +177,21 @@ where
                 path: path.as_str(),
             })?;
 
-        path.push(format!("variant({idx})"));
+        let resolved = abi
+            .resolve_type(inner_type_name)
+            .map_err(|e| DecodeError::Resolve {
+                path: inner_type_name.clone(),
+                source: e,
+            })?;
+
         let payload = decode_abi_type(py, abi, inner_type_name, decoder)?;
-        path.pop();
 
         if let Ok(dict) = payload.downcast::<PyDict>() {
-            dict.set_item("antelope_type", inner_type_name)?;
+            dict.set_item("antelope_type", resolved.resolved_name)?;
             return dict.into_bound_py_any(py);
         }
-        return Ok(payload);
+
+        return Ok(payload)
     }
 
     if let Some(struct_def) = &meta.is_struct {
@@ -271,8 +274,7 @@ fn decode_std<'py>(
                 path: path.as_str(),
                 err: e.to_string(),
             })?;
-            let bits: u128 = f.f.into();
-            PyBytes::new(py, &bits.to_le_bytes()).into_bound_py_any(py)
+            f.f.into_inner().into_bound_py_any(py)
         }
         "time_point" => {
             let mut tp: TimePoint = Default::default();

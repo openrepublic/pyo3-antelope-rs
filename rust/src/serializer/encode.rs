@@ -152,12 +152,13 @@ where
             path: path.as_str(),
             source: e,
         })?;
+
     encode_with_meta(abi, &mut meta, value, encoder, &mut path)
 }
 
 fn encode_with_meta<'py, ABI>(
     abi: &ABI,
-    meta: &mut ABIResolvedType,
+    meta: &ABIResolvedType,
     value: &Bound<'py, PyAny>,
     encoder: &mut Encoder,
     path: &mut EncodePath,
@@ -174,7 +175,7 @@ where
                     return Ok((0u8).pack(encoder));
                 }
                 let mut size = (1u8).pack(encoder);
-                size += encode_with_meta(abi, &mut new_meta, value, encoder, path)?;
+                size += encode_with_meta(abi, &new_meta, value, encoder, path)?;
                 return Ok(size);
             }
 
@@ -194,7 +195,7 @@ where
                 for (i, item) in seq.iter().enumerate() {
                     path.push(format!("[{i}]"));
 
-                    size += encode_with_meta(abi, &mut new_meta, &item, encoder, path)?;
+                    size += encode_with_meta(abi, &new_meta, &item, encoder, path)?;
 
                     path.pop();
                 }
@@ -205,7 +206,7 @@ where
                 if value.is_none() {
                     return Ok(0);
                 }
-                let sz = encode_with_meta(abi, &mut new_meta, value, encoder, path)?;
+                let sz = encode_with_meta(abi, &new_meta, value, encoder, path)?;
                 return Ok(sz);
             }
         }
@@ -215,13 +216,13 @@ where
         let (idx, sel_ty) = detect_variant(path, abi, var_meta, value)?;
         let mut size = VarUint32::from(idx).pack(encoder);
 
-        let mut inner_meta = abi
+        let inner_meta = abi
             .resolve_type(&sel_ty)
             .map_err(|e| EncodeError::Resolve {
                 path: sel_ty.clone(),
                 source: e,
             })?;
-        size += encode_with_meta(abi, &mut inner_meta, value, encoder, path)?;
+        size += encode_with_meta(abi, &inner_meta, value, encoder, path)?;
 
         return Ok(size);
     }
