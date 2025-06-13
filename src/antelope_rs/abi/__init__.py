@@ -39,11 +39,10 @@ from ._defs import (
     StructDef as StructDef,
     ActionDef as ActionDef,
     AliasDef as AliasDef,
-    TableDef as TableDef
+    TableDef as TableDef,
 )
-from ._struct_ns import (
-    build_struct_namespace
-)
+from ._struct import TypeAlias as TypeAlias, Variant as Variant, Struct as Struct
+from ._struct_ns import build_struct_namespace
 from ._validation import validate_definition
 
 # ABIView:
@@ -64,11 +63,7 @@ def _solve_cls_alias(cls: ABIClassOrAlias = None) -> ABIClass:
 
         return ABI
 
-    if not (
-        isinstance(cls, ABI)
-        and
-        isinstance(cls, ShipABI)
-    ):
+    if not (isinstance(cls, ABI) and isinstance(cls, ShipABI)):
         cls_str = 'None' if not cls else cls.__name__
         raise TypeError(f'Unknown class to init ABIView: {cls_str}')
 
@@ -76,12 +71,13 @@ def _solve_cls_alias(cls: ABIClassOrAlias = None) -> ABIClass:
 
 
 class ABIViewMeta(type):
-    '''
+    """
     When a subclass is *created* we already have its ABI definition, so we
     compute all the expensive maps just once and attach them as **class
     attributes**.  Instances are never needed.
 
-    '''
+    """
+
     _def: ABI | ShipABI
 
     alias_map: frozendict[TypeNameStr, TypeNameStr]
@@ -102,15 +98,12 @@ class ABIViewMeta(type):
         # build metadata
         cls._def = definition  # raw Rust object
 
-        cls.alias_map   = frozendict({
-            a.new_type_name: a.type_ for a in definition.types
-        })
-        cls.struct_map  = frozendict({s.name: s for s in definition.structs})
+        cls.alias_map = frozendict({a.new_type_name: a.type_ for a in definition.types})
+        cls.struct_map = frozendict({s.name: s for s in definition.structs})
         cls.variant_map = frozendict({v.name: v for v in definition.variants})
-        cls.valid_types = frozenset([
-            *builtin_types,
-            *cls.alias_map, *cls.struct_map, *cls.variant_map
-        ])
+        cls.valid_types = frozenset(
+            [*builtin_types, *cls.alias_map, *cls.struct_map, *cls.variant_map]
+        )
 
         # give each ABIView a unique module name
         mod_name = f'antelope_rs.abi._view_{name}_{int(time.time())}'
@@ -120,8 +113,8 @@ class ABIViewMeta(type):
         # Re-use the existing helper to autogenerate Python structs/aliases
         tmp_view = object.__new__(ABIView)
         tmp_view._def = definition
-        tmp_view.alias_map   = cls.alias_map
-        tmp_view.struct_map  = cls.struct_map
+        tmp_view.alias_map = cls.alias_map
+        tmp_view.struct_map = cls.struct_map
         tmp_view.variant_map = cls.variant_map
         tmp_view.valid_types = cls.valid_types
         tmp_view.resolve_type = definition.resolve_type
@@ -133,10 +126,11 @@ class ABIViewMeta(type):
 
 
 class ABIView(metaclass=ABIViewMeta):
-    '''
+    """
     Pure namespace - don’t instantiate it.  Sub-classes produced by the
     factory below have all the goodies as *class* attributes.
-    '''
+    """
+
     # factory
     @classmethod
     def from_file(
@@ -146,7 +140,7 @@ class ABIView(metaclass=ABIViewMeta):
         cls_alias: ABIClassOrAlias = None,
         name: str | None = None,
     ) -> Type[ABIView]:
-        '''
+        """
         Read JSON, decide ABI vs ShipABI, and *return a **new subclass*** that
         carries the parsed definition.
 
@@ -154,16 +148,26 @@ class ABIView(metaclass=ABIViewMeta):
         -------
         Std = ABIView.from_file('standard.json', cls_alias='std')
         Std.TransactionTrace   # ready to use
-        '''
+        """
         base_cls = _solve_cls_alias(cls_alias)
         definition = base_cls.from_file(path)
 
-        qualname = (
-            name
-            or f'{Path(path).stem.title()}ABIView'
-        )
+        qualname = name or f'{Path(path).stem.title()}ABIView'
 
         return ABIViewMeta(qualname, (cls,), {}, definition=definition)
+
+    @classmethod
+    def from_dict(
+        cls,
+        name: str,
+        abi_dict: dict,
+        *,
+        cls_alias: ABIClassOrAlias = None,
+    ) -> Type[ABIView]:
+        base_cls = _solve_cls_alias(cls_alias)
+        definition = base_cls.try_from(abi_dict)
+
+        return ABIViewMeta(name, (cls,), {}, definition=definition)
 
     @property
     def definition(self) -> ABI | ShipABI:

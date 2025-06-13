@@ -19,30 +19,29 @@ import re
 
 _camel_re = re.compile(r'(?:^|_)([a-zA-Z0-9]+)')
 
+
 def to_camel(s: str) -> str:
-    '''
+    """
     Convert snake_case string to CamelCase
 
-    '''
+    """
     s = str(s)
 
     if '_' not in s and not s.islower():  # already CamelCase
         return s
 
-    return ''.join(
-        m.group(1).capitalize()
-        for m in _camel_re.finditer(s)
-    )
+    return ''.join(m.group(1).capitalize() for m in _camel_re.finditer(s))
 
 
 _snake_re_1: re.Pattern[str] = re.compile(r'(.)([A-Z][a-z]+)')
 _snake_re_2: re.Pattern[str] = re.compile(r'([a-z0-9])([A-Z])')
 
+
 def to_snake(s: str) -> str:
-    '''
+    """
     Convert CamelCase string to snake_case
 
-    '''
+    """
     s = str(s)
 
     if s.islower():  # already snake_case
@@ -55,11 +54,11 @@ def to_snake(s: str) -> str:
 
 
 def validate_protocol(cls: type, proto):
-    '''
+    """
     Check that `cls` implements protocol `proto`, and if it doesn't provide a
     reason.
 
-    '''
+    """
     errors: list[str] = []
     for name, member in proto.__dict__.items():
         if name.startswith('_'):
@@ -80,8 +79,7 @@ def validate_protocol(cls: type, proto):
                 params_c = list(sig_c.parameters.values())[1:]
                 if len(params_c) < len(params_p):
                     errors.append(
-                        f'{name} has too few params '
-                        f'({len(params_c)}<{len(params_p)})'
+                        f'{name} has too few params ({len(params_c)}<{len(params_p)})'
                     )
         # protocol data attribute
         else:
@@ -90,4 +88,6 @@ def validate_protocol(cls: type, proto):
 
     error_str = '\n'.join(errors)
 
-    assert not errors, f'{cls.__name__} doesnt support ABINamespaceType proto: {error_str}'
+    assert not errors, (
+        f'{cls.__name__} doesnt support ABINamespaceType proto: {error_str}'
+    )

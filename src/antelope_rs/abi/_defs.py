@@ -33,12 +33,7 @@ from antelope_rs._lowlevel import (
     ShipABI,
 )
 
-from antelope_rs.meta import (
-    TypeNameStr,
-    FieldNameStr,
-    AntelopeNameStr,
-    BaseTypeNameStr
-)
+from antelope_rs.meta import TypeNameStr, FieldNameStr, AntelopeNameStr, BaseTypeNameStr
 from antelope_rs.codec import dec_hook
 
 
@@ -46,11 +41,13 @@ TypeModifier = Literal['optional'] | Literal['extension'] | Literal['array']
 TypeSuffix = Literal['?'] | Literal['$'] | Literal['[]']
 
 
-_suffixes: frozendict[TypeModifier, TypeSuffix] = frozendict({
-    'array': '[]',
-    'optional': '?',
-    'extension': '$',
-})
+_suffixes: frozendict[TypeModifier, TypeSuffix] = frozendict(
+    {
+        'array': '[]',
+        'optional': '?',
+        'extension': '$',
+    }
+)
 
 
 def suffix_for(type_mod: TypeModifier) -> TypeSuffix:
@@ -106,11 +103,11 @@ class ABIResolvedType(Struct, frozen=True):
 
 ABILike = bytes | str | dict | ABI | ShipABI
 
+
 # classmethods
 def _from_file(cls, p: Path | str):
-    return cls.from_str(
-        Path(p).read_text()
-    )
+    return cls.from_str(Path(p).read_text())
+
 
 def _try_from(cls, abi: ABILike):
     if isinstance(abi, cls):
@@ -123,7 +120,7 @@ def _try_from(cls, abi: ABILike):
         abi = json.dumps(abi)
 
     if isinstance(abi, str):
-        return cls.from_bytes(abi)
+        return cls.from_str(abi)
 
     raise TypeError(
         f'Wrong type for abi creation expected ABILike but got {type(abi).__name__}'
@@ -137,11 +134,13 @@ def _types(self) -> list[AliasDef]:
         for type_dict in self._types
     ]
 
+
 def _structs(self) -> list[StructDef]:
     return [
         convert(struct_dict, type=StructDef, dec_hook=dec_hook)
         for struct_dict in self._structs
     ]
+
 
 def _variants(self) -> list[VariantDef]:
     return [
@@ -149,17 +148,20 @@ def _variants(self) -> list[VariantDef]:
         for variant_dict in self._variants
     ]
 
+
 def _actions(self) -> list[VariantDef]:
     return [
         convert(action_dict, type=VariantDef, dec_hook=dec_hook)
         for action_dict in self._actions
     ]
 
+
 def _tables(self) -> list[VariantDef]:
     return [
         convert(table_dict, type=VariantDef, dec_hook=dec_hook)
         for table_dict in self._tables
     ]
+
 
 # methods
 def _hash(self, *, as_bytes: bool = False) -> str | bytes:
@@ -187,35 +189,33 @@ def _hash(self, *, as_bytes: bool = False) -> str | bytes:
         h.update(a.new_type_name.encode())
         h.update(a.type_.encode())
 
-    return (
-        h.digest() if as_bytes
-        else h.hexdigest()
-    )
+    return h.digest() if as_bytes else h.hexdigest()
+
 
 def _resolve_type(self, type_name: str) -> ABIResolvedType:
     return convert(
         self.resolve_type_into_dict(str(type_name)),
         type=ABIResolvedType,
-        dec_hook=dec_hook
+        dec_hook=dec_hook,
     )
 
+
 # finally monkey patch ABI & ShipABI
+
 
 def _apply_to_abi_classes(attr_name: str, fn):
     setattr(ABI, attr_name, fn)
     setattr(ShipABI, attr_name, fn)
 
-_class_methods = [
-    ('from_file', _from_file),
-    ('try_from', _try_from)
-]
+
+_class_methods = [('from_file', _from_file), ('try_from', _try_from)]
 
 _properties = [
     ('types', _types),
     ('structs', _structs),
     ('variants', _variants),
     ('actions', _actions),
-    ('tables', _tables)
+    ('tables', _tables),
 ]
 
 _methods = [

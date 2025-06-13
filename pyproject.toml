@@ -34,3 +34,21 @@ dev = [
     'pytest>=8.4.0',
     'pytest-xdist>=3.7.0',
 ]
+
+[tool.ruff]
+line-length = 80
+
+[tool.ruff.format]
+indent-style = 'space'
+quote-style = 'single'
+line-ending = 'lf'
+preview = true
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = ['Q']  # flake8-quotes rules
+ignore = ['Q002', 'D300']
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = 'single'
+docstring-quotes = 'single'

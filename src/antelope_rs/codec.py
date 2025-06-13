@@ -26,29 +26,22 @@ _convertible_classes: set[Type[Any]] = set(builtin_classes)
 
 def _is_type_alias(tp: Type[Any]) -> bool:
     from antelope_rs.abi._struct import TypeAlias
+
     return isclass(tp) and issubclass(tp, TypeAlias)
 
 
 def enc_hook(obj: Any) -> Any:
-    if (
-        type(obj) in _convertible_classes
-        or
-    _is_type_alias(type(obj))
-    ):
+    if type(obj) in _convertible_classes or _is_type_alias(type(obj)):
         return obj.to_builtins()
 
     else:
-        raise NotImplementedError(f"Objects of type {type} are not supported")
+        raise NotImplementedError(f'Objects of type {type} are not supported')
 
 
 def dec_hook(type_: Type, obj):
     origin = get_origin(type_) or type_
 
-    if (
-        origin in _convertible_classes
-        or
-        _is_type_alias(origin)
-    ):
+    if origin in _convertible_classes or _is_type_alias(origin):
         try:
             return type_.try_from(obj)
         except ValidationError as e:

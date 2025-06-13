@@ -85,8 +85,8 @@ def _bare(name: TypeNameStr | str) -> str:
 def _check_duplicates(defn) -> None:
     seen: dict[str, str] = {}
     for kind, coll in (
-        ('type',    defn.types),
-        ('struct',  defn.structs),
+        ('type', defn.types),
+        ('struct', defn.structs),
         ('variant', defn.variants),
     ):
         for obj in coll:
@@ -100,9 +100,7 @@ def _check_alias_targets(defn, defined: set[str]) -> None:
     for alias in defn.types:
         target = _bare(alias.type_)
         if target not in defined:
-            raise UndefinedTypeError(
-                f'alias {alias.new_type_name!r}', alias.type_
-            )
+            raise UndefinedTypeError(f'alias {alias.new_type_name!r}', alias.type_)
 
 
 def _check_structs(defn, defined: set[str]) -> None:
@@ -121,9 +119,8 @@ def _check_structs(defn, defined: set[str]) -> None:
 
             bare_type = _bare(fld.type_)
             if bare_type not in defined:
-                raise UndefinedTypeError(
-                    f'field {s.name!r}.{fld.name!r}', bare_type
-                )
+                raise UndefinedTypeError(f'field {s.name!r}.{fld.name!r}', bare_type)
+
 
 def _check_base_struct_extensions(defn) -> None:
     # gather every struct that is used as a base
